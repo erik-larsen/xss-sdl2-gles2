@@ -26,7 +26,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <sys/select.h>
+#ifdef _WIN32
+/* PATCH(xss-sdl): MinGW has no <sys/select.h>; select()/fd_set come from
+   winsock2 (sockets-only on Windows -- fine: no input sources are wired
+   on the SDL port yet, this just needs to compile). */
+# include <winsock2.h>
+#else
+# include <sys/select.h>
+#endif
 #include "jwxyz.h"
 #include "jwxyz-timers.h"
 #include "doubletime.h"
