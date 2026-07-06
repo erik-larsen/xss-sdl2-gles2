@@ -180,12 +180,19 @@ set(NOEGL ON CACHE BOOL "" FORCE)
 set(STATICLIB ON CACHE BOOL "" FORCE)
 set(NO_LOADER ON CACHE BOOL "" FORCE)
 set(NO_INIT_CONSTRUCTOR ON CACHE BOOL "" FORCE)
-add_subdirectory(third_party/gl4es EXCLUDE_FROM_ALL)   # target: GL
+add_subdirectory(third_party/gl4es EXCLUDE_FROM_ALL)
+# gl4es names its library target GL everywhere except Windows, where it
+# is OPENGL32 (src/CMakeLists.txt "some ES simulators used opengl32.dll").
+if(WIN32 AND NOT EMSCRIPTEN)
+  set(GL4ES_TARGET OPENGL32)
+else()
+  set(GL4ES_TARGET GL)
+endif()
 # gl4es's CMakeLists hardcodes its own source lib/ as the archive output
 # dir; with two build trees (native + web) they clobber each other's
 # libGL.a. Pin the target's output into the current build dir, and link
 # the target by name (not -lGL, which finds the stale source-tree copy).
-set_target_properties(GL PROPERTIES
+set_target_properties(${GL4ES_TARGET} PROPERTIES
   ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/gl4es-lib)
 
 set(GLUES ${CMAKE_SOURCE_DIR}/third_party/glues/source)
@@ -194,7 +201,7 @@ add_library(glues STATIC ${GLUES_SRC})
 target_compile_definitions(glues PUBLIC LIBRARYBUILD=1 XSS_GLUES_GL4ES=1)
 target_include_directories(glues PUBLIC ${GLUES}
   ${CMAKE_SOURCE_DIR}/third_party/gl4es/include)
-target_link_libraries(glues PUBLIC GL)
+target_link_libraries(glues PUBLIC ${GL4ES_TARGET})
 
 # GL side of the port (gl4es bootstrap + GLX shims + init_GL)
 add_library(xss_glport STATIC src/port/glx-sdl.c)
@@ -202,7 +209,7 @@ target_compile_definitions(xss_glport PUBLIC
   HAVE_CONFIG_H=1 HAVE_GL=1 USE_GL=1 HAVE_GLSL=1)
 target_include_directories(xss_glport PUBLIC
   src/port/glshim ${XSS}/hacks/glx)
-target_link_libraries(xss_glport PUBLIC xss_port glues GL)
+target_link_libraries(xss_glport PUBLIC xss_port glues ${GL4ES_TARGET})
 
 # xss_add_glhack(<name> [extra glx sources...]) -> port a GL hack
 function(xss_add_glhack name)

@@ -137,8 +137,22 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   visual verification (contact sheet), and **bouncingcow renders
   correctly** -- the M2b "black cow" was evidently the same binding
   desync (cow models are client-side glInterleavedArrays), not a gl4es
-  dlist-normals bug. Its Linux status pends the first CI run; still
-  run-only in smoke.sh until CI confirms.
+  dlist-normals bug. UPDATE from CI run #2: on Linux/llvmpipe the cow is
+  **still black** (smoke.sh now reports its color count), so the Mesa
+  symptom is a distinct bug after all -- black on llvmpipe, correct on
+  ANGLE/Metal and WebGL. Still run-only in smoke.sh; M2b's dlist/
+  glInterleavedArrays suspicion stands for Mesa only.
+
+- **M4d (CI findings, run #2)** CI run #1 was green on all four jobs
+  (windows soft-skipped pre-ANGLE-importlibs). Run #2 (in-job .dll.a
+  generation enabled): the import-lib step worked, but the first real
+  Windows configure failed fast -- gl4es names its CMake target
+  OPENGL32 on Windows (not GL); the top-level CMakeLists now selects
+  via GL4ES_TARGET. Linux smoke flaked FAIL(blank) on polyhedra: it
+  fades to black between shapes and animation is wall-clock driven, so
+  a fixed --frames shot can land in a fade gap on a slow runner;
+  smoke.sh's run() now retries once at a different frame count before
+  declaring blank.
 
 ## M5 — Full rollout (~250 hacks)
 - Batch conversion of remaining hacks; automated harness: run N frames

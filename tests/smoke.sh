@@ -12,16 +12,23 @@ case "$(uname)" in
 esac
 run() { # name frames
   out=/tmp/xss_smoke_$1.ppm
-  if ! $WRAP "$BUILD/$1" --frames "$2" --shot "$out" >/dev/null 2>&1; then
-    echo "FAIL(run)  $1"; fail=1; return
-  fi
-  colors=$(python3 - "$out" <<'PY'
+  # Some hacks legitimately pass through black (polyhedra fades to black
+  # between shapes), and hack animation is wall-clock driven, so a fixed
+  # frame count can land in such a gap on a slow runner. Retry once at a
+  # different frame count before calling it blank.
+  for frames in "$2" $(( $2 + 37 )); do
+    if ! $WRAP "$BUILD/$1" --frames "$frames" --shot "$out" >/dev/null 2>&1; then
+      echo "FAIL(run)  $1"; fail=1; return
+    fi
+    colors=$(python3 - "$out" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1])
 print(len(im.getcolors(1<<24) or []))
 PY
 )
+    [ "$colors" -ge 2 ] && break
+  done
   if [ "$colors" -lt 2 ]; then echo "FAIL(blank) $1"; fail=1
   else echo "PASS        $1 ($colors colors)"; fi
 }
