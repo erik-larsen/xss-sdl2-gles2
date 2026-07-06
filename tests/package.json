@@ -1,0 +1,10 @@
+{
+  "name": "xss-sdl-web-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless-browser smoke verifier deps for tests/smoke-web.sh",
+  "dependencies": {
+    "puppeteer-core": "^21.0.0",
+    "pngjs": "^7.0.0"
+  }
+}
