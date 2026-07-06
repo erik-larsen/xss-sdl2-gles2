@@ -123,7 +123,7 @@ jobs:
         shell: bash
         run: |
           if [ -e third_party/angle/lib-win/libGLESv2.dll ] && \
-             ls third_party/angle/lib-win/*GLESv2*.a >/dev/null 2>&1; then
+             [ -e third_party/angle/lib-win/libEGL.dll ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
@@ -142,6 +142,22 @@ jobs:
             mingw-w64-clang-x86_64-ninja
             mingw-w64-clang-x86_64-SDL2
             mingw-w64-clang-x86_64-libpng
+            mingw-w64-clang-x86_64-tools-git
+
+      # The repo vendors only the DLLs; the GNU import libs the CLANG64
+      # linker needs are derived artifacts, so generate them here instead
+      # of committing them (gendef reads the DLL export table, llvm-dlltool
+      # emits the .dll.a).
+      - name: Generate GNU import libs for ANGLE
+        if: steps.angle.outputs.present == 'true'
+        run: |
+          cd third_party/angle/lib-win
+          for dll in libGLESv2 libEGL; do
+            [ -f "$dll.dll.a" ] && continue
+            gendef "$dll.dll"
+            llvm-dlltool -m i386:x86-64 -d "$dll.def" -D "$dll.dll" -l "$dll.dll.a"
+          done
+          ls -l *.dll.a
 
       - name: Configure + build
         if: steps.angle.outputs.present == 'true'

@@ -43,12 +43,18 @@ that too with `install_name_tool -change ...`.)
 Copy `libEGL.dll` + `libGLESv2.dll` from Chrome. The CLANG64 toolchain
 links through **GNU import libraries** (`.dll.a`), not the MSVC `.lib`
 that sgi-demos' `lib-win/exp.bat` produces (`dumpbin`/`lib` target the
-MSVC linker). Generate the GNU import libs with MSYS2 tools:
+MSVC linker). Only the DLLs are committed; the import libs are derived
+artifacts. **CI generates them automatically** (see the "Generate GNU
+import libs" step in ci.yml). For a local MSYS2 build, generate them
+once with:
 
     gendef libGLESv2.dll
     dlltool -d libGLESv2.def -D libGLESv2.dll -l libGLESv2.dll.a
     gendef libEGL.dll
     dlltool -d libEGL.def -D libEGL.dll -l libEGL.dll.a
+
+(`gendef` is in the `mingw-w64-clang-x86_64-tools-git` package;
+`llvm-dlltool -m i386:x86-64` works where binutils `dlltool` is absent.)
 
 CMake's `find_library(NAMES GLESv2 libGLESv2 ...)` then resolves
 `libGLESv2.dll.a`; the matching `.dll` is copied next to each `.exe` at

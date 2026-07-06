@@ -36,11 +36,21 @@ run hypertorus 60
 run glmatrix 200
 run lament 60
 run polyhedra 60
-# bouncingcow: KNOWN ISSUE (renders black) -- gl4es display-list capture
-# of glInterleavedArrays(GL_N3F_V3F) appears to lose normals; geometry
-# confirmed OK via -wireframe. Tracked in MILESTONES.md M2b. Run-only:
-if $WRAP "$BUILD/bouncingcow" --frames 30 >/dev/null 2>&1; then
-  echo "PASS(run-only) bouncingcow [known-issue: black render]"
+# bouncingcow: was black on Linux/llvmpipe (M2b known issue); renders
+# correctly on macOS/ANGLE since the driver ARRAY_BUFFER-unbind fix
+# (M4c), the suspected cause of the Linux symptom too. Run-only (never
+# fails CI on blankness), but shoot + report colors so the CI log shows
+# whether Mesa renders it; promote to a full `run` once it does.
+out=/tmp/xss_smoke_bouncingcow.ppm
+if $WRAP "$BUILD/bouncingcow" --frames 30 --shot "$out" >/dev/null 2>&1; then
+  colors=$(python3 - "$out" <<'PY'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1])
+print(len(im.getcolors(1<<24) or []))
+PY
+)
+  echo "PASS(run-only) bouncingcow ($colors colors; 1 = still black on this driver)"
 else
   echo "FAIL(run)  bouncingcow"; fail=1
 fi
