@@ -1,0 +1,216 @@
+name: CI
+
+# Builds xss-sdl and runs the smoke suites. Linux-native and web jobs are
+# active and mirror the commands verified in the dev sandbox. Windows
+# (MSYS2 CLANG64) and macOS jobs follow in M4b once the sgi-demos
+# ANGLE/SDL2 build recipe is wired in -- see MILESTONES.md M4.
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # --------------------------------------------------------------- Linux
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build + headless deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            libsdl2-dev libgl1-mesa-dev libglu1-mesa-dev libgles-dev \
+            mesa-utils libgl1-mesa-dri \
+            xvfb zlib1g-dev libpng-dev python3-pil
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build (all targets)
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Native smoke suite
+        run: sh tests/smoke.sh build
+
+      - name: Upload native binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xss-sdl-linux
+          path: |
+            build/testpattern
+            build/deco
+            build/greynetic
+            build/attraction
+            build/interference
+            build/moire
+            build/gears
+            build/hypertorus
+            build/glmatrix
+            build/lament
+            build/polyhedra
+            build/bouncingcow
+          if-no-files-found: warn
+
+  # ----------------------------------------------------------------- Web
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Emscripten (pinned to the validated version)
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Chrome (for headless WebGL smoke)
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Verify toolchain
+        run: emcc --version
+
+      - name: Configure (web)
+        run: emcmake cmake -B build-web -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build (all web targets)
+        run: cmake --build build-web -j"$(nproc)"
+
+      - name: Install verifier deps
+        working-directory: tests
+        run: npm ci || npm install
+
+      - name: Web smoke suite (headless Chromium + SwiftShader)
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: sh tests/smoke-web.sh build-web
+
+      - name: Upload web pages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xss-sdl-web
+          path: |
+            build-web/*.html
+            build-web/*.js
+            build-web/*.wasm
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------- Windows
+  # MSYS2 CLANG64; native GLES2 via vendored ANGLE (third_party/angle).
+  # Builds + packages only -- headless GLES smoke on a Windows runner has
+  # no llvmpipe/xvfb equivalent, so it's deferred (see MILESTONES.md M4b).
+  # Soft-skips with a warning until third_party/angle/lib-win is populated.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check vendored ANGLE present
+        id: angle
+        shell: bash
+        run: |
+          if [ -e third_party/angle/lib-win/libGLESv2.dll ] && \
+             ls third_party/angle/lib-win/*GLESv2*.a >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Vendored ANGLE not found under third_party/angle/lib-win -- see third_party/angle/README.md. Skipping Windows build."
+          fi
+
+      - name: Setup MSYS2 CLANG64
+        if: steps.angle.outputs.present == 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            mingw-w64-clang-x86_64-cc
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-SDL2
+            mingw-w64-clang-x86_64-libpng
+
+      - name: Configure + build
+        if: steps.angle.outputs.present == 'true'
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -j"$(nproc)"
+
+      - name: Package (exes + ANGLE + SDL2 runtime DLLs)
+        if: steps.angle.outputs.present == 'true'
+        run: |
+          mkdir -p dist/xss-sdl-windows
+          cp build/*.exe dist/xss-sdl-windows/ 2>/dev/null || true
+          cp third_party/angle/lib-win/*.dll dist/xss-sdl-windows/
+          cp "$MSYSTEM_PREFIX/bin/SDL2.dll" dist/xss-sdl-windows/ 2>/dev/null || true
+          cp "$MSYSTEM_PREFIX/bin/libpng16-16.dll" dist/xss-sdl-windows/ 2>/dev/null || true
+          # NOTE: a full MinGW runtime-DLL walk (libc++, zlib, etc.) may be
+          # needed for a clean standalone zip; verify on first green run.
+
+      - name: Upload Windows package
+        if: steps.angle.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xss-sdl-windows
+          path: dist/xss-sdl-windows
+          if-no-files-found: warn
+
+  # --------------------------------------------------------------- macOS
+  # Homebrew SDL2; native GLES2 via vendored ANGLE dylibs (rpath-resolved).
+  # The runner arch must match the vendored dylibs: macos-14 = arm64,
+  # macos-13 = x86_64. Builds + packages; smoke deferred like Windows.
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check vendored ANGLE present
+        id: angle
+        run: |
+          if [ -e third_party/angle/lib-mac/libGLESv2.dylib ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Vendored ANGLE not found under third_party/angle/lib-mac -- see third_party/angle/README.md. Skipping macOS build."
+          fi
+
+      - name: Install deps
+        if: steps.angle.outputs.present == 'true'
+        run: brew install sdl2 libpng cmake ninja
+
+      - name: Configure + build
+        if: steps.angle.outputs.present == 'true'
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build -j"$(sysctl -n hw.ncpu)"
+
+      - name: Package (binaries + ANGLE dylibs)
+        if: steps.angle.outputs.present == 'true'
+        run: |
+          mkdir -p dist/xss-sdl-macos
+          for f in testpattern deco greynetic attraction interference moire \
+                   gears hypertorus glmatrix lament polyhedra bouncingcow; do
+            [ -f "build/$f" ] && cp "build/$f" dist/xss-sdl-macos/
+          done
+          cp third_party/angle/lib-mac/*.dylib dist/xss-sdl-macos/
+
+      - name: Upload macOS package
+        if: steps.angle.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: xss-sdl-macos
+          path: dist/xss-sdl-macos
+          if-no-files-found: warn
