@@ -105,6 +105,41 @@ jobs:
             build-web/*.wasm
           if-no-files-found: warn
 
+      # Gallery for GitHub Pages: assemble web/ (per-hack wasm pages +
+      # committed thumbnails in web/shots/) and regenerate the index.
+      # gen_gallery.py keeps existing thumbs when no fresh harness
+      # screenshots exist (CI has none) -- it only rewrites index.html
+      # with the built/not-built card state.
+      - name: Assemble gallery (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-pil
+          sh scripts/deploy-web.sh build-web
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  # -------------------------------------------------- GitHub Pages deploy
+  # Publishes the gallery assembled by the web job. Requires Pages to be
+  # enabled in the repo settings with Source = "GitHub Actions".
+  pages:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: web
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   # ------------------------------------------------------------- Windows
   # MSYS2 CLANG64; native GLES2 via vendored ANGLE (third_party/angle).
   # Builds + packages only -- headless GLES smoke on a Windows runner has
