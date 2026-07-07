@@ -218,8 +218,14 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   Result: 78 -> 84/86 after triage; 24-hack sample sheet visually
   verified (geodesicgears, headroom, kallisti, endgame all correct).
   Open (STATUS.csv): unicrud crash "no characters found" -> M6 fonts
-  (joins juggle/xjack/barcode); queens + quasicrystal render black
-  (investigate); lcdscrub blank (low priority).
+  (joins juggle/xjack/barcode); quasicrystal renders black (investigate);
+  lcdscrub blank (low priority).
+  queens RESOLVED (not a render bug): it fades in from black over its
+  first ~128 frames (light CONSTANT_ATTENUATION = 0.8/(0.01+findAlpha),
+  findAlpha = steps/128 ramping from 0), and chessmodels is slow through
+  gl4es, so a shot early enough to finish lands in the dark phase while
+  a shot late enough to be bright hits the harness timeout. Renders
+  correctly past frame ~128; treat as SLOW-fade, not blank.
 
 - **M5c ✅ (web): all 203 targets built for wasm; thumbnail gallery.**
   Full build-web with local emcc 4.0.12 (vs CI's pinned 3.1.6): zero
@@ -235,6 +241,16 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   gitignored; web/shots/ + index.html are committed so Pages can serve
   the gallery. Verified: gallery renders, 4 hacks spot-checked through
   their deployed card links.
+
+- **M5d ✅ (CI): gallery live on GitHub Pages.**
+  ci.yml: the web job assembles the gallery (deploy-web.sh) and uploads
+  a Pages artifact on main pushes; a new pages job (deploy-pages@v4,
+  needs: web) publishes it. Live at
+  https://erik-larsen.github.io/xss-sdl2-gles2/ -- index, per-hack
+  .html/.js/.wasm, and thumbnails all serve 200. The overall run still
+  shows red from the tabled Windows job; web + pages are green.
+  Note: the published site is ~875MB (near Pages' 1GB soft cap); M6
+  asset bundles will likely need wasm size trimming before it grows.
 
 ## M6 — Problem hacks & assets
 - textclient-backed hacks (phosphor, apple2, starwars, fontglide) →
