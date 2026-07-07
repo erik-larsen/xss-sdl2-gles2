@@ -195,6 +195,32 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   hacks pends CI (smoke.sh still covers the original 11; wiring the
   harness into CI is the natural next step).
 
+- **M5b ✅ (macOS): 86 new GL hacks. Sheet now 195/202 pass.**
+  Inventory: 138 glx modules; 34 deferred up front (textclient/analogtv/
+  image deps). Dependencies are NOT guessable per-hack (each needs a
+  specific support-source set), and upstream's Makefile.in isn't
+  vendored -- so scripts/gen_glhack_deps.py compiles every glx source
+  with the real build flags, nm's the objects, and computes each hack's
+  symbol closure; it emits cmake/batch2-glhacks.cmake (checked in,
+  regenerate rather than hand-edit). Multi-file hacks (flurry,
+  stonerview, sonar, endgame chessmodels, bubble3d...) resolve
+  automatically.
+  Build fixes: utils/easing.c added to xss_port (14 hacks reference
+  ease(); it was never compiled); xss_add_glhack_p() for hacks whose
+  XSCREENSAVER_MODULE name differs from the file name (b_lockglue ->
+  bubble3d, sproingiewrap -> sproingies). 10 more image-grab hacks
+  (load_image_async at link: carousel, esper, photopile, ...) + 
+  xshadertoy (android_read_asset_file) + molecule (molecules.h PDB data
+  not vendored) recorded BLOCKED in the generated cmake.
+  Harness: SLOW entries for the seconds-per-frame GL hacks (endgame/
+  queens chessmodels, nakagin, cubestorm -- gl4es perf pathology worth
+  a future pass); LONG for slow starters (energystream, chompytower).
+  Result: 78 -> 84/86 after triage; 24-hack sample sheet visually
+  verified (geodesicgears, headroom, kallisti, endgame all correct).
+  Open (STATUS.csv): unicrud crash "no characters found" -> M6 fonts
+  (joins juggle/xjack/barcode); queens + quasicrystal render black
+  (investigate); lcdscrub blank (low priority).
+
 ## M6 — Problem hacks & assets
 - textclient-backed hacks (phosphor, apple2, starwars, fontglide) →
   bundled text files; image hacks → bundled image set via grabclient;

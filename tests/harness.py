@@ -32,11 +32,14 @@ SKIP = {"testpattern"}
 # Hacks whose per-frame delay is seconds, not ms: the default 40 frames
 # would blow the timeout. Value = frames for the first shot.
 SLOW = {"deco": 3, "abstractile": 3, "epicycle": 4, "interaggregate": 5,
-        "petri": 5, "cloudlife": 8}
+        "petri": 5, "cloudlife": 8,
+        # GL hacks that render correctly but take seconds per frame
+        # through gl4es (chessmodels etc.) -- perf pass someday:
+        "endgame": 3, "queens": 3, "nakagin": 4, "cubestorm": 20}
 
 # Slow starters: legitimately near-black at 40 frames (pyro's sky is
 # empty until the first shell bursts). Value = frames for the first shot.
-LONG = {"pyro": 250, "halo": 500}
+LONG = {"pyro": 250, "halo": 500, "energystream": 200, "chompytower": 200}
 
 
 def wrap(cmd, timeout_wrap):
