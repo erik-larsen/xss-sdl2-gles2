@@ -17,4 +17,25 @@
  * GETTIMEOFDAY_TWO_ARGS without including <sys/time.h> themselves. */
 #include <sys/time.h>
 
+/* MinGW lacks the GNU extension strcasestr (used by utils/xft.c).
+ * config.h is included first by every hack/util TU, so a static inline
+ * here reaches them without patching vendored code. */
+#ifdef _WIN32
+#include <string.h>
+#include <ctype.h>
+static inline char *
+xss_strcasestr (const char *h, const char *n)
+{
+  if (!*n) return (char *) h;
+  for (; *h; h++) {
+    const char *a = h, *b = n;
+    while (*a && *b && tolower ((unsigned char) *a) ==
+                       tolower ((unsigned char) *b)) { a++; b++; }
+    if (!*b) return (char *) h;
+  }
+  return 0;
+}
+#define strcasestr xss_strcasestr
+#endif
+
 #endif

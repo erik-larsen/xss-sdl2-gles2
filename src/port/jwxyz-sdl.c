@@ -45,6 +45,9 @@ jwxyz_abort (const char *fmt, ...)
     jwxyz_logv (True, fmt, args);
     va_end (args);
   }
+  fflush (stderr);
+  /* jwxyz.h #defines abort() to jwxyz_abort -- don't recurse */
+# undef abort
   abort ();
 }
 

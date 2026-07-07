@@ -137,15 +137,24 @@ static int
 DrawPoints (Display *dpy, Drawable d, GC gc,
             XPoint *points, int count, int mode)
 {
-  Assert (gc->gcv.function == GXcopy, "XDrawPoints: bad GC function");
+  /* PATCH(xss-sdl): support GXxor/GXor (munch, bouboule) besides GXcopy. */
+  int func = gc->gcv.function;
+  Assert (func == GXcopy || func == GXxor || func == GXor,
+          "XDrawPoints: bad GC function");
 
   const XRectangle *frame = jwxyz_frame (d);
   short v[2] = {0, 0};
   for (unsigned i = 0; i < count; i++) {
     next_point(v, points[i], mode);
     if (v[0] >= 0 && v[0] < frame->width &&
-        v[1] >= 0 && v[1] < frame->height)
-      *SEEK_DRAWABLE(d, v[0], v[1]) = gc->gcv.foreground;
+        v[1] >= 0 && v[1] < frame->height) {
+      uint32_t *p = SEEK_DRAWABLE(d, v[0], v[1]);
+      switch (func) {
+      case GXxor: *p ^= gc->gcv.foreground; break;
+      case GXor:  *p |= gc->gcv.foreground; break;
+      default:    *p  = gc->gcv.foreground; break;
+      }
+    }
   }
 
   return 0;
@@ -264,7 +273,11 @@ fill_rects (Display *dpy, Drawable d, GC gc,
             const XRectangle *rectangles, unsigned long nrectangles,
             unsigned long pixel)
 {
-  Assert (!gc || gc->gcv.function == GXcopy, "XDrawPoints: bad GC function");
+  /* PATCH(xss-sdl): support GXxor/GXor (crystal, bouboule) besides
+     GXcopy. */
+  int func = gc ? gc->gcv.function : GXcopy;
+  Assert (func == GXcopy || func == GXxor || func == GXor,
+          "fill_rects: bad GC function");
 
   const XRectangle *frame = jwxyz_frame (d);
   void *image_data = jwxyz_image_data (d);
@@ -278,15 +291,34 @@ fill_rects (Display *dpy, Drawable d, GC gc,
       y1 = frame->height;
     if (x1 > frame->width)
       x1 = frame->width;
+    /* PATCH(xss-sdl): a rect lying entirely outside the frame (hacks
+       draw objects that drift off-screen; a real X server clips them)
+       leaves x1 < x0 or y1 < y0 here, and the unsigned subtraction
+       below then wraps to ~4G rows: wmemset scribbles past the buffer
+       and segfaults (galaxy, grav, bouboule, ... on macOS). Skip. */
+    if (x1 <= (int) x0 || y1 <= (int) y0)
+      continue;
     unsigned x_size = x1 - x0, y_size = y1 - y0;
     void *dst = SEEK_XY (image_data, image_pitch, x0, y0);
     while (y_size) {
+      switch (func) {                           /* PATCH(xss-sdl) */
+      case GXxor:
+        for(size_t j = 0; j != x_size; ++j)
+          ((uint32_t *)dst)[j] ^= (uint32_t) pixel;
+        break;
+      case GXor:
+        for(size_t j = 0; j != x_size; ++j)
+          ((uint32_t *)dst)[j] |= (uint32_t) pixel;
+        break;
+      default:
 # if __SIZEOF_WCHAR_T__ == 4
-      wmemset (dst, (wchar_t) pixel, x_size);
+        wmemset (dst, (wchar_t) pixel, x_size);
 # else
-      for(size_t i = 0; i != x_size; ++i)
-        ((uint32_t *)dst)[i] = pixel;
+        for(size_t j = 0; j != x_size; ++j)
+          ((uint32_t *)dst)[j] = pixel;
 # endif
+        break;
+      }
       --y_size;
       dst = (char *) dst + image_pitch;
     }

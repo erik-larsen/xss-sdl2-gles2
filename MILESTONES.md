@@ -161,6 +161,40 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   XScreenSaverWin's STATUS.txt as prior-failure hints.
 - Check-ins per batch (a/b/c...).
 
+- **M5a ✅ (macOS): harness + 105 new 2D hacks. 112/116 targets pass.**
+  Inventory: 144 XSCREENSAVER_MODULE 2D sources classified by dependency
+  (grep-based; the upstream hacks/Makefile.in is not vendored). Batch 1 =
+  the 105 with no textclient/analogtv/grabclient/image-set deps: 67
+  plain screenhack-API + 38 xlockmore-API (the latter build with
+  hacks/xlockmore.c, no USE_GL). droste + slip turned out to be grab
+  hacks (load_image_async) -- deferred with that class.
+  tests/harness.py: runs each built hack twice (different --frames),
+  classifies pass/static/blank/crash into tests/STATUS.{csv,md}; rows
+  accumulate across batches/platforms. Per-hack frame overrides: SLOW
+  (multi-second frame delays: deco, epicycle, ...) and LONG (slow
+  starters: pyro's empty sky, halo's gradual accumulation).
+  Port bugs found & fixed (all PATCH(xss-sdl) or project files):
+  a. **fill_rects clipping (jwxyz-image.c): rects entirely outside the
+     frame** (hacks draw objects that drift off-screen; a real X server
+     clips) left y1 < y0, and the unsigned size math wrapped to ~4G
+     rows of wmemset -> SIGSEGV. One guard fixed 15 of 19 crashing
+     hacks (galaxy, grav, bouboule, halftone, ...).
+  b. **GXxor/GXor raster ops implemented** in fill_rects + DrawPoints
+     (jwxyz-image.c asserted GXcopy-only): fixes munch, crystal
+     (GXxor), bouboule (GXor).
+  c. **jwxyz_abort recursion** (jwxyz-sdl.c): jwxyz.h #defines abort()
+     to jwxyz_abort, so its own abort() call recursed until stack
+     overflow, masking every assert message. #undef'd; asserts now
+     print before dying.
+  Remaining 4 (recorded in STATUS): juggle crashes + xjack/barcode
+  blank -- all blocked on the M6 font layer (zero-metric stubs; barcode
+  sizes its layout from font extents); lcdscrub blank -- uninvestigated
+  (LCD burn-in utility, low priority).
+  Verified: full harness green locally (112 pass), 24-hack sample
+  contact sheet visually checked. Linux/web/Windows status of the new
+  hacks pends CI (smoke.sh still covers the original 11; wiring the
+  harness into CI is the natural next step).
+
 ## M6 — Problem hacks & assets
 - textclient-backed hacks (phosphor, apple2, starwars, fontglide) →
   bundled text files; image hacks → bundled image set via grabclient;

@@ -243,6 +243,46 @@ xss_add_xhack(interference)
 xss_add_xhack(moire)
 xss_add_xhack(deco)
 
+# ------------------------------------------------- M5 batch 1: simple 2D
+# Single-file 2D hacks with no textclient/grabclient/analogtv/image-set
+# dependencies (inventoried from XSCREENSAVER_MODULE markers). Hacks that
+# fail to build or run get recorded in tests/STATUS.csv and pruned here.
+# Plain screenhack-API hacks. (droste moved to the grab-dependent class:
+# it calls load_image_async_simple.)
+set(XSS_2D_BATCH1
+  abstractile anemone anemotaxis barcode binaryhorizon
+  binaryring blaster ccurve celtic cloudlife compass coral
+  critical cynosure deluxe epicycle
+  eruption fireworkx flame fluidballs
+  fuzzyflakes goop halftone halo helix hexadrop
+  hyperball hypercube ifs imsmap interaggregate intermomentary
+  kaleidescope kumppa lcdscrub
+  lmorph marbling memscroller metaballs moire2 munch
+  nerverot pedal penetrate petri piecewise popsquares
+  pyro qix rdbomb rocks rorschach shadebobs
+  speedmine squiral starfish substrate t3d
+  truchet vermiculate wander whirlwindwarp
+  whirlygig wormhole xjack xlyap xrayswarm xspirograph
+)
+foreach(h IN LISTS XSS_2D_BATCH1)
+  xss_add_xhack(${h})
+endforeach()
+
+# xlockmore-API 2D hacks: same as above plus the xlockmore.c adapter
+# (compiled per-target, here without USE_GL -- the GL variant is what
+# xss_add_glhack links).
+set(XSS_2D_BATCH1_XLOCK
+  ant apollonian bouboule braid crystal demon discrete drift euler2d
+  fadeplot fiberlamp flow forest galaxy grav hopalong juggle julia laser
+  lightning lisa lissie loop mountain penrose polyominoes rotor scooter
+  sierpinski sphere spiral strange swirl thornbird triangle vines
+  worm
+)
+# slip: moved to the grab-dependent class (load_image_async), like droste.
+foreach(h IN LISTS XSS_2D_BATCH1_XLOCK)
+  xss_add_xhack(${h} ${XSS}/hacks/xlockmore.c)
+endforeach()
+
 # polyhedra: module prefix "polyhedra", main source polyhedra-gl.c
 set(HACK_PREFIX polyhedra)
 configure_file(src/port/hack_main.c.in ${CMAKE_BINARY_DIR}/gen/polyhedra_main.c @ONLY)
