@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xscreensaver &mdash; WebAssembly</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a0a0f; --card:#14141c; --ink:#e8e8f0; --dim:#8a8a9a; --accent:#6cf; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,system-ui,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+  header { padding:48px 24px 8px; text-align:center; }
+  h1 { margin:0 0 8px; font-size:28px; font-weight:600; letter-spacing:-.01em; }
+  header p { margin:4px auto; color:var(--dim); font-size:14px; line-height:1.5; max-width:640px; }
+  header a { color:var(--accent); text-decoration:none; }
+  .filters { text-align:center; padding:8px; }
+  .filters button { background:var(--card); color:var(--ink); border:1px solid #1f1f2a;
+    border-radius:8px; padding:6px 14px; margin:0 4px; font-size:13px; cursor:pointer; }
+  .filters button.on { border-color:var(--accent); color:var(--accent); }
+  .grid { display:grid; gap:14px; padding:24px; max-width:1400px; margin:0 auto;
+    grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
+  .card { background:var(--card); border-radius:12px; overflow:hidden; text-decoration:none;
+    color:inherit; border:1px solid #1f1f2a; transition:transform .15s,border-color .15s;
+    display:flex; flex-direction:column; }
+  a.card:hover { transform:translateY(-3px); border-color:var(--accent); }
+  .card.nobuild { opacity:.45; }
+  .thumb { aspect-ratio:4/3; background:#000 center/cover no-repeat; }
+  .meta { padding:10px 12px; display:flex; align-items:baseline; justify-content:space-between; }
+  .name { font-size:14px; font-weight:600; }
+  .tag { font-size:10px; color:var(--dim); border:1px solid #2a2a3a; padding:1px 6px; border-radius:6px; }
+  footer { text-align:center; color:var(--dim); font-size:12px; padding:24px; line-height:1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>xscreensaver</h1>
+  <p>Jamie Zawinski's <a href="https://www.jwz.org/xscreensaver/">xscreensaver</a> hacks,
+     ported to SDL2 + OpenGL&nbsp;ES&nbsp;2 and compiled to WebAssembly.
+     2D hacks render via jwxyz; GL hacks via gl4es (OpenGL&nbsp;&rarr;&nbsp;GLES2) on WebGL.</p>
+  <p style="font-size:12px;margin-top:10px;">195 hacks &middot; click to run &middot;
+     press <strong>Esc</strong> or <strong>Q</strong> to exit.</p>
+</header>
+<div class="filters">
+  <button data-f="all" class="on">all</button>
+  <button data-f="GL">GL</button>
+  <button data-f="2D">2D</button>
+</div>
+<div class="grid" id="grid"></div>
+<footer>
+  xscreensaver &copy; Jamie Zawinski et al. &middot;
+  ported with jwxyz + gl4es + glues + SDL2 + WebGL
+</footer>
+<script>
+  var hacks = [
+    ["abstractile","2D",1],
+    ["anemone","2D",1],
+    ["anemotaxis","2D",1],
+    ["ant","2D",1],
+    ["antinspect","GL",1],
+    ["antmaze","GL",1],
+    ["apollonian","2D",1],
+    ["attraction","2D",1],
+    ["b_lockglue","GL",1],
+    ["beats","GL",1],
+    ["binaryhorizon","2D",1],
+    ["binaryring","2D",1],
+    ["blaster","2D",1],
+    ["blinkbox","GL",1],
+    ["boing","GL",1],
+    ["bouboule","2D",1],
+    ["bouncingcow","GL",1],
+    ["boxed","GL",1],
+    ["braid","2D",1],
+    ["ccurve","2D",1],
+    ["celtic","2D",1],
+    ["chompytower","GL",1],
+    ["circuit","GL",1],
+    ["cityflow","GL",1],
+    ["cloudlife","2D",1],
+    ["compass","2D",1],
+    ["coral","2D",1],
+    ["covid19","GL",1],
+    ["crackberg","GL",1],
+    ["critical","2D",1],
+    ["crumbler","GL",1],
+    ["crystal","2D",1],
+    ["cube21","GL",1],
+    ["cubenetic","GL",1],
+    ["cubestack","GL",1],
+    ["cubestorm","GL",1],
+    ["cubetwist","GL",1],
+    ["cubicgrid","GL",1],
+    ["cynosure","2D",1],
+    ["dangerball","GL",1],
+    ["deco","2D",1],
+    ["deepstars","GL",1],
+    ["deluxe","2D",1],
+    ["demon","2D",1],
+    ["discoball","GL",1],
+    ["discrete","2D",1],
+    ["dnalogo","GL",1],
+    ["drift","2D",1],
+    ["dumpsterfire","GL",1],
+    ["endgame","GL",1],
+    ["energystream","GL",1],
+    ["engine","GL",1],
+    ["epicycle","2D",1],
+    ["eruption","2D",1],
+    ["etruscanvenus","GL",1],
+    ["euler2d","2D",1],
+    ["fadeplot","2D",1],
+    ["fiberlamp","2D",1],
+    ["fireworkx","2D",1],
+    ["flame","2D",1],
+    ["flow","2D",1],
+    ["fluidballs","2D",1],
+    ["flurry","GL",1],
+    ["forest","2D",1],
+    ["fuzzyflakes","2D",1],
+    ["galaxy","2D",1],
+    ["gears","GL",1],
+    ["geodesic","GL",1],
+    ["geodesicgears","GL",1],
+    ["gibson","GL",1],
+    ["glblur","GL",1],
+    ["glcells","GL",1],
+    ["glhanoi","GL",1],
+    ["glknots","GL",1],
+    ["glmatrix","GL",1],
+    ["glschool","GL",1],
+    ["glsnake","GL",1],
+    ["goop","2D",1],
+    ["grav","2D",1],
+    ["gravitywell","GL",1],
+    ["greynetic","2D",1],
+    ["halftone","2D",1],
+    ["halo","2D",1],
+    ["handsy","GL",1],
+    ["headroom","GL",1],
+    ["helix","2D",1],
+    ["hexadrop","2D",1],
+    ["hexstrut","GL",1],
+    ["hextrail","GL",1],
+    ["highvoltage","GL",1],
+    ["hilbert","GL",1],
+    ["hopalong","2D",1],
+    ["hopffibration","GL",1],
+    ["hydrostat","GL",1],
+    ["hyperball","2D",1],
+    ["hypercube","2D",1],
+    ["hypertorus","GL",1],
+    ["hypnowheel","GL",1],
+    ["ifs","2D",1],
+    ["imsmap","2D",1],
+    ["interaggregate","2D",1],
+    ["interference","2D",1],
+    ["intermomentary","2D",1],
+    ["juggler3d","GL",1],
+    ["julia","2D",1],
+    ["kaleidescope","2D",1],
+    ["kaleidocycle","GL",1],
+    ["kallisti","GL",1],
+    ["klein","GL",1],
+    ["kumppa","2D",1],
+    ["lament","GL",1],
+    ["laser","2D",1],
+    ["lightning","2D",1],
+    ["lisa","2D",1],
+    ["lissie","2D",1],
+    ["lmorph","2D",1],
+    ["lockward","GL",1],
+    ["loop","2D",1],
+    ["marbling","2D",1],
+    ["memscroller","2D",1],
+    ["menger","GL",1],
+    ["metaballs","2D",1],
+    ["moebiusgears","GL",1],
+    ["moire","2D",1],
+    ["moire2","2D",1],
+    ["morph3d","GL",1],
+    ["mountain","2D",1],
+    ["munch","2D",1],
+    ["nakagin","GL",1],
+    ["nerverot","2D",1],
+    ["noof","GL",1],
+    ["papercube","GL",1],
+    ["pedal","2D",1],
+    ["penetrate","2D",1],
+    ["penrose","2D",1],
+    ["petri","2D",1],
+    ["piecewise","2D",1],
+    ["pinion","GL",1],
+    ["pipes","GL",1],
+    ["polyhedra","GL",1],
+    ["polyominoes","2D",1],
+    ["polytopes","GL",1],
+    ["popsquares","2D",1],
+    ["projectiveplane","GL",1],
+    ["providence","GL",1],
+    ["pyro","2D",1],
+    ["qix","2D",1],
+    ["raverhoop","GL",1],
+    ["razzledazzle","GL",1],
+    ["rdbomb","2D",1],
+    ["rocks","2D",1],
+    ["romanboy","GL",1],
+    ["rorschach","2D",1],
+    ["rotor","2D",1],
+    ["rubik","GL",1],
+    ["rubikblocks","GL",1],
+    ["scooter","2D",1],
+    ["shadebobs","2D",1],
+    ["sierpinski","2D",1],
+    ["sierpinski3d","GL",1],
+    ["skulloop","GL",1],
+    ["sonar","GL",1],
+    ["speedmine","2D",1],
+    ["sphere","2D",1],
+    ["spheremonics","GL",1],
+    ["spiral","2D",1],
+    ["splodesic","GL",1],
+    ["sproingiewrap","GL",1],
+    ["squiral","2D",1],
+    ["squirtorus","GL",1],
+    ["starfish","2D",1],
+    ["stonerview","GL",1],
+    ["strange","2D",1],
+    ["substrate","2D",1],
+    ["superquadrics","GL",1],
+    ["surfaces","GL",1],
+    ["swirl","2D",1],
+    ["t3d","2D",1],
+    ["tangram","GL",1],
+    ["thornbird","2D",1],
+    ["topblock","GL",1],
+    ["triangle","2D",1],
+    ["tronbit","GL",1],
+    ["truchet","2D",1],
+    ["vermiculate","2D",1],
+    ["vines","2D",1],
+    ["voronoi","GL",1],
+    ["wander","2D",1],
+    ["whirlwindwarp","2D",1],
+    ["whirlygig","2D",1],
+    ["worm","2D",1],
+    ["wormhole","2D",1],
+    ["xlyap","2D",1],
+    ["xrayswarm","2D",1],
+    ["xspirograph","2D",1]
+  ];
+  var g = document.getElementById('grid');
+  hacks.forEach(function(h){
+    var name=h[0], klass=h[1], built=h[2];
+    var el=document.createElement(built?'a':'div');
+    el.className='card'+(built?'':' nobuild'); el.dataset.k=klass;
+    if(built) el.href=name+'/'+name+'.html';
+    el.innerHTML='<div class="thumb" style="background-image:url(\'shots/'+name+'.jpg\')"></div>'+
+      '<div class="meta"><div class="name">'+name+'</div><div class="tag">'+klass+
+      (built?'':' &middot; native only')+'</div></div>';
+    g.appendChild(el);
+  });
+  document.querySelectorAll('.filters button').forEach(function(b){
+    b.onclick=function(){
+      document.querySelectorAll('.filters button').forEach(function(x){x.className='';});
+      b.className='on';
+      document.querySelectorAll('.card').forEach(function(c){
+        c.style.display=(b.dataset.f==='all'||c.dataset.k===b.dataset.f)?'':'none';
+      });
+    };
+  });
+</script>
+</body>
+</html>

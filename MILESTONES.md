@@ -221,6 +221,21 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   (joins juggle/xjack/barcode); queens + quasicrystal render black
   (investigate); lcdscrub blank (low priority).
 
+- **M5c ✅ (web): all 203 targets built for wasm; thumbnail gallery.**
+  Full build-web with local emcc 4.0.12 (vs CI's pinned 3.1.6): zero
+  failures, and spot-verified rendering in headless Chrome (testpattern,
+  deco, gears, substrate, hextrail, glmatrix, flurry) -- no
+  newer-emsdk gl4es loader issue on this project (the host calls
+  eglGetProcAddress + initialize_gl4es explicitly).
+  Gallery (rss-sdl2-gles2 pattern): scripts/gen_gallery.py converts the
+  harness screenshots (/tmp/xss_harness) into web/shots/*.jpg thumbs and
+  emits web/index.html -- card grid, 2D/GL filter, cards dim to "native
+  only" when a hack's wasm build isn't deployed. scripts/deploy-web.sh
+  assembles web/<hack>/ from build-web/. web/*/ (875MB of wasm) is
+  gitignored; web/shots/ + index.html are committed so Pages can serve
+  the gallery. Verified: gallery renders, 4 hacks spot-checked through
+  their deployed card links.
+
 ## M6 — Problem hacks & assets
 - textclient-backed hacks (phosphor, apple2, starwars, fontglide) →
   bundled text files; image hacks → bundled image set via grabclient;

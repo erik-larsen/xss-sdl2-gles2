@@ -3,3 +3,7 @@ web-dist/
 node_modules/
 .DS_Store
 *.o
+# assembled gallery: per-hack wasm copies are build artifacts; the
+# thumbnails + index are committed so Pages can deploy them directly
+web/*/
+!web/shots/
