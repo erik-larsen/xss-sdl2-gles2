@@ -342,9 +342,13 @@ set(XSS_2D_TEXTCLIENT xmatrix fontglide)  # noseguy needs image assets (M6b)
 foreach(h IN LISTS XSS_2D_TEXTCLIENT)
   xss_add_xhack(${h})
 endforeach()
-# DEFERRED (need depth-1 XYPixmap XGetImage for their font/TV capture,
-# a jwxyz-image gap): phosphor (ansi-tty terminal), apple2 (apple2-main.c
-# module + analogtv NTSC sim + ansi-tty).
+# DEFERRED: phosphor + apple2 (terminal/TV hacks via ansi-tty.c).
+# Groundwork done in jwxyz-image.c GetSubImage -- depth-1 XGetImage (their
+# font/TV capture) and readback alpha-strip (white-on-black threshold no
+# longer yields solid blocks). phosphor now runs + captures glyphs but its
+# multi-stage glyph->screen blit still shows only the cursor; apple2 also
+# needs its apple2-main.c module wiring + analogtv NTSC sim verified. A
+# focused session on the remaining pipeline, not this batch.
 
 # GL textclient hacks: text via texfont (GL font texture built through
 # jwxyz_render_text). deps from gen_glhack_deps.py.

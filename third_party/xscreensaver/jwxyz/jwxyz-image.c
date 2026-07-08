@@ -532,14 +532,64 @@ GetSubImage (Display *dpy, Drawable d, int x, int y,
   Assert ((x < 65535 && x > -65535), "improbably large x");
   Assert ((y < 65535 && y > -65535), "improbably large y");
 
-  Assert (dest_image->depth == 32 && jwxyz_drawable_depth (d) == 32,
-          "XGetSubImage: bad depth");
-  Assert (format == ZPixmap, "XGetSubImage: bad format");
+  if (dest_image->depth == 32 && jwxyz_drawable_depth (d) == 32) {
+    Assert (format == ZPixmap, "XGetSubImage: bad format");
+    jwxyz_blit (jwxyz_image_data (d), jwxyz_image_pitch (d), x, y,
+                dest_image->data, dest_image->bytes_per_line, dest_x, dest_y,
+                width, height);
+    /* PATCH(xss-sdl): strip the internal opaque-alpha from a read-back
+       image. Drawables store black as BlackPixel == alpha_mask
+       (0xFF000000) so it composites opaquely, but a returned XImage is
+       visible RGB data: leaving alpha set makes "black" non-zero, which
+       breaks the common white-on-black readback + `pixel ? 1 : 0`
+       threshold (phosphor/apple2 font capture -> every glyph a solid
+       block). Zeroing alpha is harmless for GXcopy re-blits (alpha
+       ignored) and only matters to alpha_allowed re-blits, which don't
+       read pixels back this way. */
+    uint32_t amask = (uint32_t)
+      DefaultVisualOfScreen (DefaultScreenOfDisplay (dpy))->alpha_mask;
+    if (amask) {
+      for (unsigned r = 0; r < height; r++) {
+        uint32_t *row = (uint32_t *)
+          (dest_image->data + (size_t) (dest_y + (int) r)
+           * dest_image->bytes_per_line) + dest_x;
+        for (unsigned c = 0; c < width; c++)
+          row[c] &= ~amask;
+      }
+    }
+    return dest_image;
+  }
 
-  jwxyz_blit (jwxyz_image_data (d), jwxyz_image_pitch (d), x, y,
-              dest_image->data, dest_image->bytes_per_line, dest_x, dest_y,
-              width, height);
-
+  /* PATCH(xss-sdl): read back a depth-1 drawable into a 1-bit image.
+     Port drawables are stored 32bpp regardless of logical depth (a
+     depth-1 pixmap holds 0 / foreground(1) pixels), so pack "pixel != 0"
+     into the dest's LSB-first bitmap. phosphor/apple2 capture their font
+     glyphs this way (XGetImage(mono_pixmap, ..., XYPixmap)). */
+  Assert (dest_image->depth == 1,
+          "XGetSubImage: unsupported depth combination");
+  {
+    const XRectangle *frame = jwxyz_frame (d);
+    const uint32_t *sdata = (const uint32_t *) jwxyz_image_data (d);
+    ptrdiff_t spitch = jwxyz_image_pitch (d);   /* bytes */
+    uint8_t *ddata = (uint8_t *) dest_image->data;
+    int dbpl = dest_image->bytes_per_line;
+    for (unsigned row = 0; row < height; row++) {
+      int sy = y + (int) row;
+      const uint32_t *srow =
+        (const uint32_t *) ((const uint8_t *) sdata + (size_t) sy * spitch);
+      uint8_t *drow = ddata + (size_t) (dest_y + (int) row) * dbpl;
+      for (unsigned col = 0; col < width; col++) {
+        int sx = x + (int) col;
+        int set = (sx >= 0 && sx < frame->width &&
+                   sy >= 0 && sy < frame->height && srow[sx] != 0);
+        int dx = dest_x + (int) col;
+        if (set)
+          drow[dx >> 3] |=  (1 << (dx & 7));
+        else
+          drow[dx >> 3] &= ~(1 << (dx & 7));
+      }
+    }
+  }
   return dest_image;
 }
 

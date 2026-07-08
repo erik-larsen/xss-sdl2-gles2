@@ -321,6 +321,27 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   image assets (noseguy et al) will need the two faces trimmed or shared
   before they fit. Pages redeploy on next push to main.
 
+- **M6c (partial): phosphor/apple2 groundwork; both still DEFERRED.**
+  Two jwxyz-image.c GetSubImage fixes landed (PATCH(xss-sdl)), both
+  regression-verified across all 209 hacks (0 regressions):
+  a. **depth-1 XGetImage**: read a depth-1 drawable back into a 1-bit
+     image (the port stores all drawables 32bpp; pack "pixel != 0").
+     Needed by phosphor/apple2 font capture (XGetImage(mono, XYPixmap));
+     previously aborted "XGetSubImage: bad depth".
+  b. **readback alpha-strip**: a 32bpp readback now clears the internal
+     opaque-alpha (BlackPixel == alpha_mask 0xFF000000, kept so black
+     composites opaquely). Without it a white-on-black readback +
+     `pixel ? 1 : 0` threshold (phosphor/apple2 font capture) makes every
+     glyph a solid block. Harmless to GXcopy re-blits.
+  With both, phosphor no longer crashes and captures glyph shapes (not
+  blocks), but its multi-stage glyph->screen blit still shows only the
+  cursor -- so phosphor stays DEFERRED (unregistered; would otherwise
+  ship an empty terminal). apple2 also needs its apple2-main.c module
+  wiring + analogtv NTSC sim verified. The crash/solid-block/readback
+  issues are solved; what remains is phosphor's glyph-blit and apple2's
+  TV path -- a focused session. Sheet 206/209 pass (lightning is
+  intermittent; flipped back to pass this run).
+
 
 ## M3a (emscripten) -- delivered
 
