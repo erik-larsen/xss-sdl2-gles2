@@ -35,12 +35,15 @@ def registered_hacks():
             continue
         for m in re.finditer(pat, open(f).read()):
             hacks[m.group(1)] = klass
-    # foreach-list registrations in CMakeLists (batch 1)
+    # foreach-list registrations in CMakeLists (batch 1 + textclient)
     text = open(os.path.join(ROOT, "CMakeLists.txt")).read()
-    for listname in ("XSS_2D_BATCH1", "XSS_2D_BATCH1_XLOCK"):
+    for listname in ("XSS_2D_BATCH1", "XSS_2D_BATCH1_XLOCK",
+                     "XSS_2D_TEXTCLIENT"):
         m = re.search(r"set\(" + listname + r"\s+(.*?)\)", text, re.S)
         if m:
-            for n in m.group(1).split():
+            # strip inline comments (e.g. "# noseguy needs assets")
+            body = re.sub(r"#[^\n]*", "", m.group(1))
+            for n in body.split():
                 hacks[n] = "2D"
     hacks["polyhedra"] = "GL"          # manual registration
     hacks.pop("name", None)            # function definitions, not hacks

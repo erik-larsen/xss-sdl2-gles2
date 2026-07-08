@@ -294,6 +294,33 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   ~960MB). Font verified in wasm too -- xjack and unicrud render text in
   headless Chrome. Pages redeploy happens on the next push to main.
 
+- **M6b ✅ (macOS): monospace face + 7 textclient hacks. Sheet 205/209.**
+  Monospace: added a second embedded face (subset Liberation Mono, 91KB),
+  selected in jwxyz-font.c when the caller sets JWXYZ_STYLE_MONOSPACE or
+  the family name matches courier/mono/fixed/console/terminal. xjack now
+  renders monospaced (it asks for Courier/monospace via the Xft layer).
+  Textclient: the terminal/text hacks stream chars from textclient_getc.
+  Upstream Unix pipes a subprocess; we reuse utils/textclient-mobile.c
+  (its column wrapping + streaming) and supply its two platform hooks in
+  src/port/textclient-sdl.c -- no subprocess, no network, so it works in
+  the browser too. The default "date" textMode returns the current date
+  plus a rotating public-domain passage (Moby Dick, Tale of Two Cities,
+  Frost, pangrams, Hitchhiker's), so hacks show flowing prose out of the
+  box. 7 new hacks wired + verified rendering: xmatrix, fontglide (2D),
+  fliptext, gltext (3D extruded text -- gorgeous), starwars (opening
+  crawl), splitflap (split-flap board), winduprobot. GL ones get text
+  through texfont, which builds a GL font texture via jwxyz_render_text.
+  DEFERRED: phosphor + apple2 need depth-1 XYPixmap XGetImage (their
+  font/TV capture) -- a jwxyz-image gap; noseguy needs image assets (M6
+  images).
+  Web: all targets rebuilt (0 failures); gltext/starwars/xmatrix verified
+  rendering in headless Chrome (font + textclient + texfont GL path all
+  work in wasm). Gallery regenerated -> 205 cards (gen_gallery.py now
+  also reads the XSS_2D_TEXTCLIENT list). Gallery 978MB -- still under
+  the 1GB Pages cap but tightening (mono face + 7 hacks added ~57MB);
+  image assets (noseguy et al) will need the two faces trimmed or shared
+  before they fit. Pages redeploy on next push to main.
+
 
 ## M3a (emscripten) -- delivered
 

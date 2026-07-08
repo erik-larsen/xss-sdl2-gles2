@@ -25,9 +25,11 @@
 #define STBTT_STATIC
 #include "stb_truetype.h"
 
-/* Embedded TTF bytes (generated: cmake/font_data.c from third_party/font). */
-extern const unsigned char xss_font_ttf[];
+/* Embedded TTF bytes (generated from third_party/font by bin2c.py). */
+extern const unsigned char xss_font_ttf[];        /* Liberation Sans   */
 extern const unsigned int  xss_font_ttf_len;
+extern const unsigned char xss_font_mono_ttf[];   /* Liberation Mono   */
+extern const unsigned int  xss_font_mono_ttf_len;
 
 typedef struct {
   stbtt_fontinfo info;
@@ -68,6 +70,22 @@ jwxyz_default_font_family (int require)
   }
 }
 
+/* Case-insensitive substring test over a length-bounded name. */
+static int
+name_has (const char *name, size_t len, const char *needle)
+{
+  size_t nl = strlen (needle);
+  if (len < nl) return 0;
+  for (size_t i = 0; i + nl <= len; i++) {
+    size_t k = 0;
+    while (k < nl &&
+           ((name[i+k] | 0x20) == (needle[k] | 0x20)))
+      k++;
+    if (k == nl) return 1;
+  }
+  return 0;
+}
+
 void *
 jwxyz_load_native_font (Window main_window,
                         int traits_jwxyz, int mask_jwxyz,
@@ -76,14 +94,24 @@ jwxyz_load_native_font (Window main_window,
                         char **family_name_ret,
                         int *ascent_ret, int *descent_ret)
 {
-  (void) main_window; (void) traits_jwxyz; (void) mask_jwxyz;
-  (void) font_name_ptr; (void) font_name_length; (void) font_name_type;
+  (void) main_window; (void) mask_jwxyz; (void) font_name_type;
+
+  /* Pick the monospace face when the caller asked for it by trait, or
+     when the requested family name is a known monospaced one. */
+  int mono = (traits_jwxyz & JWXYZ_STYLE_MONOSPACE) ||
+    (font_name_ptr &&
+     (name_has (font_name_ptr, font_name_length, "courier") ||
+      name_has (font_name_ptr, font_name_length, "mono")    ||
+      name_has (font_name_ptr, font_name_length, "fixed")   ||
+      name_has (font_name_ptr, font_name_length, "console")  ||
+      name_has (font_name_ptr, font_name_length, "terminal")));
+  const unsigned char *ttf = mono ? xss_font_mono_ttf : xss_font_ttf;
 
   xss_font *f = calloc (1, sizeof (*f));
   if (!f) return 0;
 
-  if (!stbtt_InitFont (&f->info, xss_font_ttf,
-                       stbtt_GetFontOffsetForIndex (xss_font_ttf, 0))) {
+  if (!stbtt_InitFont (&f->info, ttf,
+                       stbtt_GetFontOffsetForIndex (ttf, 0))) {
     free (f);
     return 0;
   }
@@ -97,7 +125,8 @@ jwxyz_load_native_font (Window main_window,
   f->ascent  = (int) (a * f->scale + 0.5f);
   f->descent = (int) (-d * f->scale + 0.5f);
 
-  if (family_name_ret) *family_name_ret = strdup ("Liberation Sans");
+  if (family_name_ret)
+    *family_name_ret = strdup (mono ? "Liberation Mono" : "Liberation Sans");
   if (ascent_ret)  *ascent_ret  = f->ascent;
   if (descent_ret) *descent_ret = f->descent;
   return f;
