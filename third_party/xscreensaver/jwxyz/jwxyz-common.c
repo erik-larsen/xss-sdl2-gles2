@@ -1527,10 +1527,24 @@ Xutf8TextExtents (XFontSet set, const char *str, int len,
 }
 
 
+/* PATCH(xss-sdl): X11 GCs carry a server default font; jwxyz GCs start
+   with font==NULL. Hacks that draw text without ever calling XSetFont
+   (juggle draws its pattern label on the bare MI_GC) would then deref
+   &((Font)0)->metrics. Lazily install a default font, mirroring the X
+   server, so such hacks render their text instead of crashing. */
+static void
+ensure_gc_font (Display *dpy, GC gc)
+{
+  XGCValues *gcv = VTBL->gc_gcv (gc);
+  if (!gcv->font)
+    XSetFont (dpy, gc, XLoadFont (dpy, "fixed"));
+}
+
 int
 jwxyz_draw_string (Display *dpy, Drawable d, GC gc, int x, int y,
                    const char *str, size_t len, int utf8_p)
 {
+  ensure_gc_font (dpy, gc);
   const XGCValues *gcv = VTBL->gc_gcv (gc);
   Font ff = gcv->font;
   XCharStruct cs;
@@ -1626,6 +1640,7 @@ XDrawImageString (Display *dpy, Drawable d, GC gc, int x, int y,
 {
   int ascent, descent, dir;
   XCharStruct cs;
+  ensure_gc_font (dpy, gc);   /* PATCH(xss-sdl): see jwxyz_draw_string */
   XTextExtents (&VTBL->gc_gcv (gc)->font->metrics, str, len,
                 &dir, &ascent, &descent, &cs);
   jwxyz_fill_rect (dpy, d, gc,

@@ -39,7 +39,11 @@ SLOW = {"deco": 3, "abstractile": 3, "epicycle": 4, "interaggregate": 5,
 
 # Slow starters: legitimately near-black at 40 frames (pyro's sky is
 # empty until the first shell bursts). Value = frames for the first shot.
-LONG = {"pyro": 250, "halo": 500, "energystream": 200, "chompytower": 200}
+LONG = {"pyro": 250, "halo": 500, "energystream": 200, "chompytower": 200,
+        "glmatrix": 200}  # code-rain fills in gradually
+# Inherently intermittent (flash/fade between events); a single shot can
+# legitimately land dark. Left at default -- treat a lone blank as flaky.
+# e.g. lightning.
 
 
 def wrap(cmd, timeout_wrap):

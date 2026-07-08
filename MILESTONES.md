@@ -258,6 +258,42 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   sonar → simulation mode; webcollage → excluded; font layer
   (FreeType/stb_truetype against bundled fonts).
 
+- **M6a ✅ (macOS): real fonts. Sheet 198/202 pass, 0 crashes.**
+  Text was invisible (jwxyz font stubs returned zero metrics). Now
+  src/port/jwxyz-font.c rasterizes one embedded font with stb_truetype
+  (third_party/stb_truetype.h, public domain). Font = Liberation Sans
+  (Helvetica-metric, SIL OFL), subset with pyftsubset to Latin/Greek/
+  Cyrillic/punct/currency/arrows/symbols (~1100 glyphs, 410KB -> 97KB)
+  so it doesn't blow the web size budget in ~200 binaries; embedded as a
+  C array at build time (scripts/bin2c.py, CMake custom command) so only
+  the .ttf is committed. jwxyz_render_text implements the jwxyz-common
+  contract: XCharStruct metrics + a (rbearing-lbearing)x(ascent+descent)
+  32bpp white-coverage bitmap that draw_string tints with the GC fg and
+  alpha-composites. All families map to the one face for now (mono
+  later). See third_party/font/README.md.
+  Fixes (fonts + two latent jwxyz gaps, PATCH(xss-sdl)):
+  a. **xjack, unicrud** now render text (unicrud was CRASHING "no
+     characters found" -- the stub font had zero glyphs).
+  b. **juggle** (was crashing): it draws its pattern label on the bare
+     MI_GC without XSetFont; jwxyz GCs have no default font (X servers
+     do), so &((Font)0)->metrics -> 0x28 deref. jwxyz-common.c now
+     lazily installs a default font in jwxyz_draw_string / XDrawImageString.
+  c. **barcode** (was blank): it draws into 1-bit pixmaps and XPutImages
+     them; jwxyz-image.c's depth==1 XPutImage path was an unimplemented
+     Log() stub. Implemented: expand each bit to GC fg/bg with bounds
+     clipping.
+  Regression: full 202-hack harness re-run, 0 real regressions (glmatrix/
+  halo/lightning flagged pass->blank were animation-phase flakiness --
+  glmatrix rain fills in ~200 frames now in LONG; lightning flashes
+  intermittently). Binary size +~117KB/target (gears 1.37->1.49MB).
+  Remaining 4 blank: quasicrystal (open black-render), queens (slow
+  fade-in, renders past ~frame 128), lightning (intermittent), lcdscrub
+  (burn-in utility, low priority).
+  Web: all 203 targets rebuilt with the subset font (0 failures); gallery
+  921MB (subset kept it under the 1GB Pages cap; full font would be
+  ~960MB). Font verified in wasm too -- xjack and unicrud render text in
+  headless Chrome. Pages redeploy happens on the next push to main.
+
 
 ## M3a (emscripten) -- delivered
 

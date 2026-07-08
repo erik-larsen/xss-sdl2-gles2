@@ -492,7 +492,29 @@ PutImage (Display *dpy, Drawable d, GC gc, XImage *ximage,
                   jwxyz_image_data (d), jwxyz_image_pitch (d), dest_x, dest_y,
                   w, h);
     } else {
-      Log ("XPutImage: depth == 1");
+      /* PATCH(xss-sdl): 1-bit XImage -> 32bpp drawable. Expand each bit
+         to the GC foreground (1) or background (0), the X semantics for
+         XPutImage of a bitmap. barcode draws into 1-bit pixmaps then
+         XPutImages them to the screen; without this it was invisible.
+         Bits are LSB-first within each byte (jwxyz XImage convention). */
+      const XRectangle *frame = jwxyz_frame (d);
+      uint32_t fg = (uint32_t) gcv->foreground;
+      uint32_t bg = (uint32_t) gcv->background;
+      const uint8_t *sdata = (const uint8_t *) ximage->data;
+      uint8_t *ddata = (uint8_t *) jwxyz_image_data (d);
+      for (int row = 0; row < h; row++) {
+        int dy = dest_y + row;
+        if (dy < 0 || dy >= frame->height) continue;
+        const uint8_t *srow = sdata + (size_t) (src_y + row) * src_pitch;
+        uint32_t *drow = (uint32_t *) (ddata + (size_t) dy * dst_pitch);
+        for (int col = 0; col < w; col++) {
+          int dx = dest_x + col;
+          if (dx < 0 || dx >= frame->width) continue;
+          int sx = src_x + col;
+          int bit = (srow[sx >> 3] >> (sx & 7)) & 1;
+          drow[dx] = bit ? fg : bg;
+        }
+      }
     }
   }
 

@@ -106,8 +106,23 @@ xss_add_hack(testpattern src/hacks/testpattern.c)
 # ----------------------------------------------------- xscreensaver port
 set(XSS  ${CMAKE_SOURCE_DIR}/third_party/xscreensaver)
 
+# Embed the bundled font (Liberation Sans) as a C byte array at build
+# time -- keeps the ~410KB .ttf as the only committed binary, no 2.5MB
+# generated source in git. Python3 is already a build/CI dependency.
+set(FONT_TTF ${CMAKE_SOURCE_DIR}/third_party/font/LiberationSans-subset.ttf)
+set(FONT_DATA_C ${CMAKE_BINARY_DIR}/gen/font_data.c)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_command(
+  OUTPUT ${FONT_DATA_C}
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/bin2c.py
+          ${FONT_TTF} xss_font_ttf ${FONT_DATA_C}
+  DEPENDS ${FONT_TTF} ${CMAKE_SOURCE_DIR}/scripts/bin2c.py
+  COMMENT "Embedding font ${FONT_TTF}")
+
 add_library(xss_port STATIC
   src/port/jwxyz-sdl.c
+  src/port/jwxyz-font.c
+  ${FONT_DATA_C}
   src/port/jwxyz-arcs.c
   src/port/jwxyz-png.c
   ${XSS}/hacks/ximage-loader.c
@@ -137,6 +152,7 @@ target_include_directories(xss_port PUBLIC
   src/port src/driver ${XSS}/jwxyz ${XSS}/utils ${XSS}/hacks
   ${CMAKE_SOURCE_DIR}/third_party/gl4es/include
   ${CMAKE_SOURCE_DIR}/third_party/glues/source
+  ${CMAKE_SOURCE_DIR}/third_party
   src/port/glshim)
 # Like Android.mk: these must be on the command line, not just config.h,
 # because hacks test STANDALONE etc. before their first #include.

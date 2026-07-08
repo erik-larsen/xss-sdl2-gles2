@@ -238,74 +238,7 @@ get_string_resource (Display *dpy, char *res_name, char *res_class)
 }
 
 /* ------------------------------------------------------------------ */
-/* Fonts -- M1b stubs.                                                 */
-/* Sane metrics, no glyph rendering.  Real text lands in M6 via        */
-/* FreeType/stb_truetype against xscreensaver's bundled fonts.         */
-/* ------------------------------------------------------------------ */
-
-struct xss_stub_font { int size; };
-
-const char *
-jwxyz_default_font_family (int require)
-{
-  switch (require) {
-  case JWXYZ_FONT_FAMILY & JWXYZ_STYLE_MONOSPACE: return "Courier";
-  default:                                        return "Helvetica";
-  }
-}
-
-void *
-jwxyz_load_native_font (Window main_window,
-                        int traits_jwxyz, int mask_jwxyz,
-                        const char *font_name_ptr, size_t font_name_length,
-                        int font_name_type, float size,
-                        char **family_name_ret,
-                        int *ascent_ret, int *descent_ret)
-{
-  (void) main_window; (void) traits_jwxyz; (void) mask_jwxyz;
-  (void) font_name_ptr; (void) font_name_length; (void) font_name_type;
-
-  struct xss_stub_font *f = calloc (1, sizeof (*f));
-  f->size = (int) (size > 0 ? size : 12);
-  if (family_name_ret) *family_name_ret = strdup ("Stub");
-  if (ascent_ret)  *ascent_ret  = (int) (f->size * 0.8);
-  if (descent_ret) *descent_ret = (int) (f->size * 0.2);
-  return f;
-}
-
-void
-jwxyz_release_native_font (Display *dpy, void *native_font)
-{
-  (void) dpy;
-  free (native_font);
-}
-
-void
-jwxyz_render_text (Display *dpy, void *native_font,
-                   const char *str, size_t len, Bool utf8, Bool antialias_p,
-                   XCharStruct *cs_ret, char **pixmap_ret)
-{
-  (void) dpy; (void) utf8; (void) antialias_p;
-  struct xss_stub_font *f = native_font;
-  int w = (int) (len * f->size * 0.6);
-  (void) w;
-
-  /* Zero-size metrics: jwxyz_draw_string's contract treats w==0/h==0
-     as "nothing to draw" and never touches the bitmap. Advancing width
-     stays 0 too -- text is simply invisible until real fonts in M6. */
-  if (cs_ret)
-    memset (cs_ret, 0, sizeof (*cs_ret));
-  if (pixmap_ret)
-    *pixmap_ret = NULL;
-}
-
-char *
-jwxyz_unicode_character_name (Display *dpy, Font fid, unsigned long uc)
-{
-  (void) dpy; (void) fid; (void) uc;
-  return strdup ("STUB");
-}
-
+/* Fonts moved to jwxyz-font.c (stb_truetype rasterizer, M6). */
 /* ------------------------------------------------------------------ */
 /* Typed resource getters (under HAVE_ANDROID, resources.c expects     */
 /* the platform to provide these; semantics copied from                */
