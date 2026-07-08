@@ -15,6 +15,19 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 add_compile_options(-Wall -Wextra)
 
+# The web build must stay at -O2 (RelWithDebInfo; -O3 miscompiles gl4es
+# -> blank gears), but RelWithDebInfo's -g embeds DWARF, which is ~77% of
+# every .wasm (gears: 4.5MB of debug vs 1MB of code). The gallery ships
+# no source maps, so strip debug for emscripten only -- keeps the -O2
+# codegen, drops DWARF, and takes the deployed gallery from ~970MB to
+# ~200MB. Native keeps -g for lldb. Set before targets + gl4es subdir so
+# everything (including the -g0 at link, which is what actually strips)
+# inherits it.
+if(EMSCRIPTEN)
+  set(CMAKE_C_FLAGS_RELWITHDEBINFO   "-O2 -g0 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g0 -DNDEBUG")
+endif()
+
 # jwxyz defines Xlib-named symbols (XQueryPointer, ...). On Linux, SDL2
 # dynamically links real libX11; if our executables export those names,
 # SDL's Xlib calls bind to jwxyz and crash. Hidden visibility keeps the

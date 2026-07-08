@@ -362,6 +362,22 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   experiments reverted; stays a documented known-blank. Don't re-try the
   1D->2D angle.
 
+- **M6e ✅ (web size): strip DWARF -> gallery 978MB -> 232MB (-76%).**
+  Dissecting a .wasm showed the RelWithDebInfo `-g` DWARF sections
+  (.debug_info/line/loc/str/...) were ~77% of every binary (gears: 4.5MB
+  debug vs 1.0MB code). The gallery ships no source maps, so debug info
+  is dead weight. CMakeLists now sets CMAKE_C/CXX_FLAGS_RELWITHDEBINFO to
+  "-O2 -g0 -DNDEBUG" for EMSCRIPTEN only (keeps the required -O2 codegen
+  -- -O3 miscompiles gl4es; native keeps -g for lldb). Set before the
+  gl4es subdir so it strips there too; the -g0 at link is what actually
+  drops the DWARF. gears 5.88->1.20MB, deco 3.26->0.67MB, largest wasm
+  7.6->2.2MB. 0 build failures; gears/lament/gltext/deco/substrate
+  re-verified rendering in headless Chrome. Comfortable headroom under
+  the 1GB Pages cap now (unblocks the image-grab hacks). Further size
+  levers if ever needed: a shared gl4es runtime (MAIN/SIDE_MODULE; the
+  remaining ~1MB/wasm is a full gl4es copy per binary) -- real work,
+  deferred; -Oz risks gl4es miscompiles, not pursued.
+
 
 ## M3a (emscripten) -- delivered
 
