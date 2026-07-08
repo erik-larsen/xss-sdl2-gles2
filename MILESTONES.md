@@ -286,9 +286,9 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   halo/lightning flagged pass->blank were animation-phase flakiness --
   glmatrix rain fills in ~200 frames now in LONG; lightning flashes
   intermittently). Binary size +~117KB/target (gears 1.37->1.49MB).
-  Remaining 4 blank: quasicrystal (open black-render), queens (slow
-  fade-in, renders past ~frame 128), lightning (intermittent), lcdscrub
-  (burn-in utility, low priority).
+  Remaining 4 blank: quasicrystal (open black-render -- see M6d for the
+  dead-end), queens (slow fade-in, renders past ~frame 128), lightning
+  (intermittent), lcdscrub (burn-in utility, low priority).
   Web: all 203 targets rebuilt with the subset font (0 failures); gallery
   921MB (subset kept it under the 1GB Pages cap; full font would be
   ~960MB). Font verified in wasm too -- xjack and unicrud render text in
@@ -341,6 +341,26 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   issues are solved; what remains is phosphor's glyph-blit and apple2's
   TV path -- a focused session. Sheet 206/209 pass (lightning is
   intermittent; flipped back to pass this run).
+
+- **M6d (investigation, no code change): quasicrystal black-render is
+  NOT the 1D texture.** quasicrystal draws a GL_TEXTURE_1D colormap onto
+  blended quads. Ruled out the obvious cause: converting it to a real 2D
+  Nx1 texture (glTexImage2D + GL_TEXTURE_2D throughout, the microcosm
+  approach) STILL renders black. Findings:
+  - Geometry is fine: forcing untextured opaque quads fills the screen.
+  - gl4es reports no GL/shader/texture errors; NPOT is supported.
+  - With texturing on it goes fully black; GL_MODULATE + the sampled
+    colormap yields zero output, so the texture samples as transparent
+    black (unsampled) rather than the gradient. Forcing GL_REPLACE gives
+    a uniform gray, not the expected stripes -- so the immediate-mode
+    texcoord/texenv path, not 1D vs 2D, is the problem.
+  - It also uses desktop-only GL_COLOR_LOGIC_OP / glLogicOp (its contrast
+    pass), which GLES2/gl4es lacks entirely -- another gap in the same
+    hack.
+  Conclusion: a multi-feature desktop-GL hack that needs real gl4es
+  immediate-mode-texturing + logic-op work, not a quick fix. All
+  experiments reverted; stays a documented known-blank. Don't re-try the
+  1D->2D angle.
 
 
 ## M3a (emscripten) -- delivered
