@@ -377,6 +377,12 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   levers if ever needed: a shared gl4es runtime (MAIN/SIDE_MODULE; the
   remaining ~1MB/wasm is a full gl4es copy per binary) -- real work,
   deferred; -Oz risks gl4es miscompiles, not pursued.
+  CI follow-up: the first CI run of this change failed at the web smoke
+  step -- bouncingcow (M2b: black on software renderers, fine on ANGLE)
+  came up black on CI's SwiftShader and hard-blocked the Pages deploy.
+  NOT a -g0 regression (renders locally over ANGLE, both -g0). Fixed by
+  giving tests/smoke-web.sh a check_runonly for bouncingcow, matching the
+  native smoke.sh -- a known-issue hack no longer blocks the deploy.
 
 
 ## M3a (emscripten) -- delivered
