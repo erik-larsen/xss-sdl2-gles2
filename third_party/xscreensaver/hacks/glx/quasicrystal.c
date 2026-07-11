@@ -437,7 +437,17 @@ draw_quasicrystal (ModeInfo *mi)
 
   /* Clip the colors to simulate contrast. */
 
+#ifdef HAVE_ANDROID
+  /* PATCH(xss-sdl): this contrast pass needs GL_COLOR_LOGIC_OP
+     (glLogicOp GL_AND_REVERSE), which GLES2 does not have at all --
+     through gl4es the quad below renders as a plain opaque fill, painting
+     the whole screen uniform grey (1 - contrast/200 = 0.85 -> the
+     mysterious constant 217,217,217) OVER the correct interference
+     pattern every frame. Skip it; the pattern just shows uncontrasted. */
+  if (0)
+#else
   if (bp->contrast > 0)
+#endif
     {
       /* If c > 0, map 0 - 100 to 0.5 - 1.0, and use (s & ~d) */
       GLfloat c = 1 - (bp->contrast / 2 / 100.0);

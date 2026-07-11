@@ -382,6 +382,17 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
 
     /* --- GLES context request: the sgi-demos pattern, one path ----- */
     SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+#if defined(__APPLE__) && !defined(__EMSCRIPTEN__)
+    /* Make the vendored ANGLE use its native Metal backend. Its default
+     * on macOS is the OpenGL backend, which sits on Apple's deprecated
+     * GL-on-Metal stack (GLEngine) -- and that path stalls in
+     * glMapBufferRange (gldWaitForObject: a full GPU sync) on every
+     * client-array draw gl4es submits. Display-list-heavy hacks (queens,
+     * endgame, nakagin, cubestorm, jigsaw: chessmodels etc.) ran at
+     * SECONDS per frame; on the Metal backend they are 50-200x faster.
+     * Users can still override with their own ANGLE_DEFAULT_PLATFORM. */
+    setenv("ANGLE_DEFAULT_PLATFORM", "metal", 0 /* don't clobber */);
+#endif
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_EGL, 1);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);

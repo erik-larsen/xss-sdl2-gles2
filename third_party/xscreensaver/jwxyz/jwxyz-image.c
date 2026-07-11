@@ -179,12 +179,36 @@ draw_line (Drawable d, unsigned long pixel,
 // TODO: Assert line_Width == 1, line_stipple == solid, etc.
 
   const XRectangle *frame = jwxyz_frame (d);
-  if (x0 < 0 || x0 >= frame->width ||
-      x1 < 0 || x1 >= frame->width ||
-      y0 < 0 || y0 >= frame->height ||
-      y1 < 0 || y1 >= frame->height) {
-    Log ("draw_line: out of bounds");
-    return;
+
+  /* PATCH(xss-sdl): clip lines to the frame instead of dropping them.
+     A real X server clips; hacks legitimately draw lines that touch or
+     cross the edge (lcdscrub's stripes end exactly at width/height and
+     were ALL dropped -> solid blank; juggle/phosphor logged this too).
+     Cohen-Sutherland endpoint clip; the couple-of-LSB Bresenham phase
+     difference vs true X11 clipping is invisible here. */
+  {
+    int fw = frame->width, fh = frame->height;
+# define OUTCODE(x, y) (((x) < 0 ? 1 : (x) >= fw ? 2 : 0) | \
+                        ((y) < 0 ? 4 : (y) >= fh ? 8 : 0))
+    int c0 = OUTCODE (x0, y0), c1 = OUTCODE (x1, y1);
+    while (c0 | c1) {
+      int c, nx, ny;
+      double t;
+      if (c0 & c1)
+        return;                        /* fully outside, nothing to draw */
+      c = c0 ? c0 : c1;
+      if (c & 8)                       /* below */
+        t = (fh - 1 - y0) / (double) (y1 - y0), nx = x0 + (int) ((x1 - x0) * t + 0.5), ny = fh - 1;
+      else if (c & 4)                  /* above */
+        t = (0 - y0) / (double) (y1 - y0),      nx = x0 + (int) ((x1 - x0) * t + 0.5), ny = 0;
+      else if (c & 2)                  /* right */
+        t = (fw - 1 - x0) / (double) (x1 - x0), ny = y0 + (int) ((y1 - y0) * t + 0.5), nx = fw - 1;
+      else                             /* left */
+        t = (0 - x0) / (double) (x1 - x0),      ny = y0 + (int) ((y1 - y0) * t + 0.5), nx = 0;
+      if (c == c0) { x0 = nx; y0 = ny; c0 = OUTCODE (x0, y0); }
+      else         { x1 = nx; y1 = ny; c1 = OUTCODE (x1, y1); }
+    }
+# undef OUTCODE
   }
 
   int dx = abs(x1 - x0), dy = abs(y1 - y0);

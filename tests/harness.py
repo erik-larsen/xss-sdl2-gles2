@@ -32,18 +32,20 @@ SKIP = {"testpattern"}
 # Hacks whose per-frame delay is seconds, not ms: the default 40 frames
 # would blow the timeout. Value = frames for the first shot.
 SLOW = {"deco": 3, "abstractile": 3, "epicycle": 4, "interaggregate": 5,
-        "petri": 5, "cloudlife": 8,
-        # GL hacks that render correctly but take seconds per frame
-        # through gl4es (chessmodels etc.) -- perf pass someday:
-        "endgame": 3, "queens": 3, "nakagin": 4, "cubestorm": 20}
+        "petri": 5, "cloudlife": 8}
+# (The former seconds-per-frame GL entries -- endgame, queens, nakagin,
+# cubestorm -- were an ANGLE-backend pathology, fixed by the driver
+# forcing ANGLE_DEFAULT_PLATFORM=metal on macOS. They run at full speed
+# now.)
 
 # Slow starters: legitimately near-black at 40 frames (pyro's sky is
 # empty until the first shell bursts). Value = frames for the first shot.
 LONG = {"pyro": 250, "halo": 500, "energystream": 200, "chompytower": 200,
         "glmatrix": 200,   # code-rain fills in gradually
-        # grab hacks with a slow fade-in from black (jigsaw is also
-        # seconds-per-frame slow; 150 renders and fits the timeout):
-        "glslideshow": 300, "jigsaw": 150}
+        # grab hacks with a slow fade-in from black:
+        "glslideshow": 300, "jigsaw": 150,
+        # queens fades in over its first ~128 frames:
+        "queens": 200}
 # Inherently intermittent (flash/fade between events); a single shot can
 # legitimately land dark. Left at default -- treat a lone blank as flaky.
 # e.g. lightning.

@@ -415,6 +415,46 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   Apple ][ mode) so it stays deferred with apple2/xanalogtv on the
   analogtv work.
 
+- **M6g ✅ (macOS): the last three known-blanks fixed. Sheet 233/233 --
+  EVERY shipping hack passes, 0 blank, 0 crash.**
+  a. **lcdscrub** (blank): jwxyz-image.c draw_line REJECTED any line
+     touching/crossing the frame edge instead of clipping (a real X
+     server clips) -- lcdscrub's stripes end exactly at width/height, so
+     every line was dropped, leaving only the solid fill. Implemented
+     Cohen-Sutherland endpoint clipping [PATCH(xss-sdl)]. Also un-drops
+     juggle/phosphor's edge lines ("draw_line: out of bounds" log spam
+     gone).
+  b. **queens (+ the whole chessmodels perf pathology)**: profiling
+     (sample) showed the main thread stalled in glMapBufferRange ->
+     gldWaitForObject -> IOKit -- a FULL GPU SYNC on every client-array
+     draw, inside Apple's deprecated GLEngine. Root cause: the vendored
+     ANGLE defaults to its OpenGL backend on macOS (renderer string
+     "OpenGL 4.1 Metal"), which sits on Apple's GL-on-Metal stack.
+     Forcing ANGLE's native Metal backend (driver now setenv's
+     ANGLE_DEFAULT_PLATFORM=metal on __APPLE__ native, don't-clobber) is
+     50-200x faster: queens 3.7s/frame -> 60fps, endgame 18s/frame ->
+     0.08s. SLOW harness entries for endgame/queens/nakagin/cubestorm
+     removed; queens joins LONG (200 -- its real ~128-frame fade-in).
+     Full-suite regression: 0 regressions on the Metal backend.
+  c. **quasicrystal** (the M6d mystery constant): NOT the texture path
+     at all. Instrumenting gl4es's FPE end-to-end (state, program cache,
+     generated GLSL, attribute streams) proved texture, sampler,
+     shaders, and texcoords all correct -- the giveaway was forcing the
+     fragment shader to output the texcoord and STILL seeing constant
+     grey with a nonzero blue channel: a different draw was painting
+     over everything. It's the hack's final CONTRAST pass:
+     glLogicOp(GL_AND_REVERSE) + blend off + fullscreen quad at
+     1-contrast/200 = 0.85 -- GLES2 has no logic ops, so through gl4es
+     the quad is a plain opaque fill: 0.85*255 = the constant 217 grey,
+     over the CORRECT interference pattern every frame. Skipped the
+     logic-op pass under HAVE_ANDROID [PATCH(xss-sdl)]; the full
+     quasicrystal plane-wave tiling now renders (121 colors).
+  Stale build/phosphor binary removed again (not a CMake target; it had
+  crept back into the sheet as a cursor-only "pass").
+  Web: the driver env change is __APPLE__-native-only (no web impact);
+  the line-clip + quasicrystal patches DO affect web -- CI's web job
+  rebuilds fresh on push, so the Pages redeploy picks them up.
+
 
 ## M3a (emscripten) -- delivered
 
