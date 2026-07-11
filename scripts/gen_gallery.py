@@ -38,7 +38,7 @@ def registered_hacks():
     # foreach-list registrations in CMakeLists (batch 1 + textclient)
     text = open(os.path.join(ROOT, "CMakeLists.txt")).read()
     for listname in ("XSS_2D_BATCH1", "XSS_2D_BATCH1_XLOCK",
-                     "XSS_2D_TEXTCLIENT"):
+                     "XSS_2D_TEXTCLIENT", "XSS_2D_GRAB"):
         m = re.search(r"set\(" + listname + r"\s+(.*?)\)", text, re.S)
         if m:
             # strip inline comments (e.g. "# noseguy needs assets")

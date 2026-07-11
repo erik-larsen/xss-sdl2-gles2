@@ -384,6 +384,37 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   giving tests/smoke-web.sh a check_runonly for bouncingcow, matching the
   native smoke.sh -- a known-issue hack no longer blocks the deploy.
 
+- **M6f ✅ (macOS): 24 image-grab hacks via colour-bars grabclient.
+  Sheet 230/233 pass, 0 crashes.**
+  The grab hacks ask grabclient for a screenshot/photo to manipulate;
+  upstream X11 forks xscreensaver-getimage (impossible on web). Same
+  recipe as textclient (M6b): reuse the mobile path -- utils/grabclient.c
+  under HAVE_ANDROID calls one platform hook, jwxyz_draw_random_image();
+  src/port/grabclient-sdl.c supplies it, returning NULL so grabclient
+  falls back to its standard SMPTE colour bars (drawn by
+  utils/colorbars.c, logo params take 0 -- zero image assets, works in
+  the browser). A bundled photo can replace the NULL later for nicer
+  output.
+  Wired: 14 2D (blitspin boxfit bumps decayscreen distort droste ripples
+  rotzoomer slidescreen slip spotlight tessellimage twang zoom; slip
+  needs xlockmore.c, tessellimage needs delaunay.c, blitspin uses its
+  vendored som_png.h) + 10 GL (antspotlight
+  carousel esper flipflop flipscreen3d gflux glslideshow jigsaw
+  mirrorblob photopile, deps via gen_glhack_deps.py; utils/xftwrap.c
+  added to xss_port for carousel/photopile's xft_word_wrap). All 24
+  verified rendering, native + 5 spot-checked in wasm (headless Chrome)
+  -- contact sheets show each hack manipulating the bars (droste
+  recursion, jigsaw pieces, gflux flag, mirrorblob, photopile
+  polaroids...).
+  Harness: glslideshow (300) + jigsaw (150) added to LONG (slow fade-in);
+  jigsaw is also seconds-per-frame slow (chessmodels class) and needs
+  --timeout 300 to capture. gen_gallery.py reads XSS_2D_GRAB. Gallery
+  now 230 cards / 257MB (still ~1/4 of the Pages cap post-M6e).
+  Note: the embedded logo images (images/gen/*_png.h) are all vendored
+  (bsod's 15 OS logos included), but bsod #includes apple2.h (its
+  Apple ][ mode) so it stays deferred with apple2/xanalogtv on the
+  analogtv work.
+
 
 ## M3a (emscripten) -- delivered
 
