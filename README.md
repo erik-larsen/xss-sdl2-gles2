@@ -1,5 +1,7 @@
 # xss-sdl — xscreensaver → SDL2 + OpenGL ES 2.0
 
+![screenshot](media/screenshot.png)
+
 Port of [xscreensaver](https://github.com/Zygo/xscreensaver) hacks to
 SDL2 + GLES2, building natively for Linux/macOS/Windows and for the web
 via Emscripten. One executable (or web page) per hack.
