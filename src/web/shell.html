@@ -94,6 +94,25 @@
   // document.title, so the tab name becomes "xscreensaver: <hack>".
   var Module = {
     canvas: (function () { return document.getElementById('canvas'); })(),
+    // Prefetch one random image from the bundled CC0 set for the
+    // image-grabbing hacks (grabclient-sdl.c reads it synchronously at
+    // grab time). Failure is fine: the hack falls back to colour bars.
+    preRun: [function () {
+      addRunDependency('xss-image');
+      fetch('../images/index.json')
+        .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+        .then(function (list) {
+          var pick = list[Math.floor(Math.random() * list.length)];
+          return fetch('../images/' + pick).then(function (r) {
+            if (!r.ok) throw 0; return r.arrayBuffer();
+          }).then(function (buf) {
+            Module.xssImageBytes = new Uint8Array(buf);
+            Module.xssImageName = pick;
+          });
+        })
+        .catch(function () {})
+        .finally(function () { removeRunDependency('xss-image'); });
+    }],
     print: function (t) { console.log(t); },
     printErr: function (t) { console.warn(t); },
     setStatus: function (t) {

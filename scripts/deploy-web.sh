@@ -21,6 +21,13 @@ for f in "$WEB"/*.html; do
 done
 echo "deployed $n hacks into web/"
 
+# bundled CC0 image set for the grab hacks (shared across all pages;
+# each hack page prefetches one at random -- see src/web/shell.html)
+mkdir -p web/images
+cp assets/images/*.jpg web/images/ 2>/dev/null || true
+( cd web/images && ls *.jpg 2>/dev/null | \
+  python3 -c "import json,sys; json.dump([l.strip() for l in sys.stdin], open('index.json','w'))" )
+
 python3 scripts/gen_gallery.py
 python3 scripts/gen_options.py
-echo "Serve with: cd web && python3 -m http.server"
+echo "Serve with: python3 scripts/serve-web.py"

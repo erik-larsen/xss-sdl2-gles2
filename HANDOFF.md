@@ -109,6 +109,11 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
    emscripten path) — use `build-web-m7` (current emsdk) or reconfigure.
 3. Native `--help` option tables (rss-port did this with a gen script).
 
+**Image hacks** now use the bundled CC0 landscape set (M10,
+`assets/images/` + provenance README; native reads the dir, web
+prefetches one image per page in the shell). Colour bars remain the
+no-image fallback.
+
 **Platform**
 - **Windows native build** — actively in progress (tip commit added
   `mesa_wgl.h`). CI Windows job gated on vendored ANGLE + historically
