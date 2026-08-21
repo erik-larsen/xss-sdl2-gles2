@@ -204,6 +204,11 @@ if(NOT EMSCRIPTEN)
   find_package(Threads REQUIRED)
   target_link_libraries(xss_port PUBLIC Threads::Threads)
 endif()
+if(EMSCRIPTEN)
+  # every hack links xss_port, so a --shell-file edit relinks them all
+  set_property(TARGET xss_port PROPERTY INTERFACE_LINK_DEPENDS
+               ${CMAKE_SOURCE_DIR}/src/web/shell.html)
+endif()
 
 # xss_add_xhack(<name> [extra sources...]) -> port a real 2D hack
 function(xss_add_xhack name)

@@ -65,9 +65,13 @@ consume_hack_options (const XrmOptionDescRec *opts, int argc, char **argv)
 {
   int out = 1;
   for (int i = 1; i < argc; i++) {
+    /* Tables use X-style single-dash options ("-delay", "-no-wander");
+     * accept the GNU spelling the config XMLs / web query args use. */
+    const char *arg = argv[i];
+    if (arg[0] == '-' && arg[1] == '-' && arg[2]) arg++;
     const XrmOptionDescRec *m = NULL;
     for (const XrmOptionDescRec *o = opts; o && o->option; o++)
-      if (!strcmp (argv[i], o->option)) { m = o; break; }
+      if (!strcmp (arg, o->option)) { m = o; break; }
 
     if (!m) {
       argv[out++] = argv[i];

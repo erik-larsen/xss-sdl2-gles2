@@ -81,9 +81,12 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
    (M7a)**. Config XMLs now vendored at
    `third_party/xscreensaver/hacks/config/` (matches 6.15);
    gen_gallery.py parses label/description/author/year.
-2. Live web settings panel driven by those config XMLs (the old M3c
-   deferred item). Hook already exists: `xss_web_args` parses the page
-   query string → argv. XML sliders/booleans/selects → form controls.
+2. ~~Live web settings panel~~ — **done (M7b)**: gear button on every
+   hack page → drawer built from `options.json`
+   (scripts/gen_options.py, hooked into deploy-web.sh). En-route port
+   fixes: `--foo`→`-foo` option matching, web-lenient unknown args,
+   %-decoding in xss_web_args. NB: local `build-web` is dead (stale
+   emscripten path) — use `build-web-m7` (current emsdk) or reconfigure.
 3. Native `--help` option tables (rss-port did this with a gen script).
 
 **Platform**

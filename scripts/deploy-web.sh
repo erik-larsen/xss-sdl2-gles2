@@ -22,4 +22,5 @@ done
 echo "deployed $n hacks into web/"
 
 python3 scripts/gen_gallery.py
+python3 scripts/gen_options.py
 echo "Serve with: cd web && python3 -m http.server"

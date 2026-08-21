@@ -19,6 +19,7 @@
 #include <SDL.h>
 #include <SDL_opengles2.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,15 +27,33 @@
 #ifdef __EMSCRIPTEN__
 # include <emscripten.h>
 
+/* %XX / '+' decode in place (query-string values, e.g. -text strings). */
+static void
+url_decode (char *s)
+{
+    char *d = s;
+    for (; *s; s++, d++) {
+        if (*s == '+') *d = ' ';
+        else if (*s == '%' && isxdigit ((unsigned char) s[1])
+                           && isxdigit ((unsigned char) s[2])) {
+            char hex[3] = { s[1], s[2], 0 };
+            *d = (char) strtol (hex, NULL, 16);
+            s += 2;
+        } else *d = *s;
+    }
+    *d = 0;
+}
+
 /* Build an argv from the page's query string: ?frames=60&shot=o.ppm
  * becomes { prog, "--frames", "60", "--shot", "o.ppm" }. Unknown keys
- * pass through as --key value and hit the driver's normal parser. */
+ * pass through as --key value and hit the driver's normal parser
+ * (which forwards hack options via consume_hack_options first). */
 char **
 xss_web_args (int *argc_ret)
 {
-    static char *argv[64];
-    static char buf[1024];
-    static char keys[32][40];
+    static char *argv[128];
+    static char buf[2048];
+    static char keys[60][40];
     int argc = 0, nk = 0;
     argv[argc++] = "hack";
 
@@ -50,13 +69,13 @@ xss_web_args (int *argc_ret)
 
     char *save = NULL;
     for (char *tok = strtok_r (buf, "&", &save);
-         tok && argc < 62 && nk < 32;
+         tok && argc < 126 && nk < 60;
          tok = strtok_r (NULL, "&", &save)) {
         char *eq = strchr (tok, '=');
         snprintf (keys[nk], sizeof keys[nk], "--%.*s",
                   eq ? (int)(eq - tok) : (int) strlen (tok), tok);
         argv[argc++] = keys[nk++];
-        if (eq && eq[1]) argv[argc++] = eq + 1;
+        if (eq && eq[1]) { url_decode (eq + 1); argv[argc++] = eq + 1; }
     }
     argv[argc] = NULL;
     *argc_ret = argc;
@@ -369,7 +388,17 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
         else if (!strcmp(argv[i], "--frames") && i+1 < argc) g.frames_limit = atol(argv[++i]);
         else if (!strcmp(argv[i], "--shot")   && i+1 < argc) g.shot_path = argv[++i];
         else if (!strcmp(argv[i], "--fps"))                  g.show_fps = true;
+#ifdef __EMSCRIPTEN__
+        /* Web args come from a user-editable URL; skip junk (and its
+         * value) instead of killing the page. */
+        else {
+            fprintf(stderr, "%s: ignoring unknown option %s\n",
+                    argv[0], argv[i]);
+            if (i+1 < argc && argv[i+1][0] != '-') i++;
+        }
+#else
         else { usage(argv[0]); return 2; }
+#endif
     }
 
     SDL_SetMainReady();

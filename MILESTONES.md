@@ -476,6 +476,48 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
 - Also fixed en route: removed the stale "BLOCKED on image grab" list
   in cmake/batch2-glhacks.cmake (those 10 hacks shipped in M6f).
 
+- **M7b ✅ live web settings panel (tier 2).** Every web hack page now
+  has a gear button (appears on mouse move, screensaver-style) opening
+  a settings drawer generated from the hack's config XML; Apply
+  reloads with the chosen options as query args, Reset clears them.
+  Pieces:
+  - `scripts/gen_options.py`: XML → compact `web/<hack>/options.json`
+    (sliders/spinbuttons with the upstream `convert=` semantics —
+    invert mirrors the scale, ratio is geometric so the default sits
+    mid-scale; booleans with arg-set/arg-unset polarity; selects where
+    the no-arg option is the default — NOT always index 0; strings).
+    Skips controls the port replaces (xscreensaver-image/-text, file).
+    Hooked into deploy-web.sh, so CI ships schemas for all 233.
+  - `src/web/shell.html`: drawer UI, ~230 lines, no deps. Prefills
+    from the current query string, emits only non-default values
+    (sliders snap the 1000-step grid position back to the exact
+    default so an untouched slider emits nothing), preserves query
+    args it doesn't own (--frames, --width). stopPropagation on key
+    events inside the drawer so typing in a text field doesn't reach
+    SDL (the hack quits on Q!).
+  - Port fixes that made it work at all — **hack options via query
+    string were silently broken before**: (1) consume_hack_options
+    matched argv against the tables' X-style single-dash options with
+    exact strcmp, so the `--foo` spellings xss_web_args produces (and
+    the config XMLs use) never matched — now `--foo` falls back to
+    `-foo`; (2) unknown args killed the page (usage() + exit 2) —
+    web builds now warn-and-skip instead, native stays strict;
+    (3) xss_web_args didn't %XX-decode values — added url_decode
+    (gltext's `--text '%A%n%d %b %Y%n%r'` needs it: literal %s);
+    also raised its caps (64→128 argv, 1024→2048B qs).
+  - CMake: `INTERFACE_LINK_DEPENDS` on xss_port so editing shell.html
+    relinks the hacks (it silently didn't before).
+  Verified end-to-end in a served browser: gears (invert slider at
+  correct default; wireframe toggle → `?wireframe` → wireframe
+  render), xmatrix (select default at index 1 preselected; binary
+  mode → 0/1 rain), gltext (date option's quoted multi-token %-laden
+  value round-trips → live clock renders), Reset → bare URL. Native:
+  full rebuild + smoke.sh all-pass; `--wireframe`/`-wireframe` both
+  accepted, unknown args still exit 2.
+  NB local build-web is dead (configured against a deleted emscripten
+  checkout); build-web-m7 is a fresh emsdk-4.0.12 config. CI unaffected
+  (fresh configure every run).
+
 
 ## M3a (emscripten) -- delivered
 
