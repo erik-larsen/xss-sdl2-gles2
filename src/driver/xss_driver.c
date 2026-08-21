@@ -131,6 +131,12 @@ __attribute__((weak)) void xss_driver_gl_ready(void) {}
  * masked this; ANGLE/Metal renders opaque black without it. */
 __attribute__((weak)) void xss_gl_pre_swap(void) {}
 __attribute__((weak)) void xss_gl_post_swap(void) {}
+/* retained-framebuffer hooks for no-clear (trails) GL hacks; strong
+ * versions live in glx-sdl.c */
+__attribute__((weak)) void xss_gl_frame_begin(const char *n, int w, int h)
+{ (void)n; (void)w; (void)h; }
+__attribute__((weak)) void xss_gl_frame_end(const char *n, int w, int h)
+{ (void)n; (void)w; (void)h; }
 
 /* ------------------------------------------------------------------ */
 /* GLES2 blit: one textured quad, y-flip done in the texture coords    */
@@ -353,7 +359,11 @@ static void tick(void)
         return;     /* not yet time for the next hack frame */
     }
 
+    if (g.hack->gl_p)
+        xss_gl_frame_begin(g.hack->name, g.win_w, g.win_h);
     g.delay_us = g.hack->draw(&g.surf, g.hack_state);
+    if (g.hack->gl_p)
+        xss_gl_frame_end(g.hack->name, g.win_w, g.win_h);
     g.next_frame_ticks = now + g.delay_us / 1000;
     if (!g.hack->gl_p)
         blit_surface();                /* 2D: upload CPU surface + quad */

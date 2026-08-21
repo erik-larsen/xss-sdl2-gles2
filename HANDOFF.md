@@ -78,6 +78,11 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
   buffer; don't set ALPHA_SIZE back to 0 on web, and don't remove
   clamp_alpha() — without it the browser composites the page through
   the canvas.
+- **No-clear hacks** (M8): noof self-restores (works after M8a);
+  flurry can't and gets a driver-level retained framebuffer
+  (xss_gl_frame_begin/end in glx-sdl.c, retain list keyed by
+  progclass). Any future hack that composites over the previous frame
+  without clearing goes in that list.
 
 ## Pending work (prioritized)
 

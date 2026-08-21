@@ -15,6 +15,7 @@
 #define SDL_MAIN_HANDLED 1
 #include <SDL.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "gl4esinit.h"
 #ifdef __EMSCRIPTEN__
@@ -84,6 +85,113 @@ xss_gl_init_once (void)
 #endif
   initialize_gl4es ();
   gl4es_ready = True;
+}
+
+/* ---- retained framebuffer for no-clear (trails) hacks -------------
+ *
+ * A few hacks composite frame N atop frame N-1 without ever clearing,
+ * assuming an X11-style preserved buffer. Post-swap contents are
+ * undefined on ANGLE/Metal and discarded outright by the web canvas,
+ * so for those hacks the driver brackets each frame with these hooks:
+ * frame_begin redraws a saved copy of the previous frame, frame_end
+ * captures the new frame back into the texture. This is exactly the
+ * save/restore noof.c implements internally (hacks that self-restore
+ * are NOT listed here); doing it through gl4es keeps its state cache
+ * coherent, and GL_RGB capture stays legal from any framebuffer. */
+
+static GLuint retain_tex = 0;
+static int retain_w = 0, retain_h = 0;     /* window size captured    */
+static int retain_tw = 0, retain_th = 0;   /* pow2 texture size       */
+static Bool retain_primed = False;         /* texture holds a frame   */
+
+static Bool
+retain_hack_p (const char *progclass)
+{
+  static const char *const list[] = { "Flurry", 0 };
+  for (const char *const *p = list; *p; p++)
+    if (!strcmp (progclass, *p)) return True;
+  return False;
+}
+
+static int
+to_pow2 (int i)
+{
+  int p = 1;
+  while (p < i) p <<= 1;
+  return p;
+}
+
+void
+xss_gl_frame_begin (const char *progclass, int w, int h)
+{
+  if (!gl4es_ready || !retain_hack_p (progclass)) return;
+
+  if (!retain_tex || w != retain_w || h != retain_h) {
+    if (!retain_tex) glGenTextures (1, &retain_tex);
+    retain_w = w;  retain_h = h;
+    retain_tw = to_pow2 (w);  retain_th = to_pow2 (h);
+    glBindTexture (GL_TEXTURE_2D, retain_tex);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D (GL_TEXTURE_2D, 0, GL_RGB, retain_tw, retain_th, 0,
+                  GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindTexture (GL_TEXTURE_2D, 0);
+    retain_primed = False;
+    return;                         /* first frame: nothing to restore */
+  }
+  if (!retain_primed) return;
+
+  glPushAttrib (GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT |
+                GL_DEPTH_BUFFER_BIT | GL_TEXTURE_BIT | GL_TRANSFORM_BIT |
+                GL_VIEWPORT_BIT);
+  glDisable (GL_BLEND);
+  glDisable (GL_DEPTH_TEST);
+  glDisable (GL_ALPHA_TEST);
+  glDisable (GL_LIGHTING);
+  glDisable (GL_CULL_FACE);
+  glDisable (GL_SCISSOR_TEST);
+  glEnable (GL_TEXTURE_2D);
+  glViewport (0, 0, w, h);
+  glMatrixMode (GL_PROJECTION);
+  glPushMatrix ();
+  glLoadIdentity ();
+  glOrtho (0, 1, 0, 1, -1, 1);
+  glMatrixMode (GL_MODELVIEW);
+  glPushMatrix ();
+  glLoadIdentity ();
+
+  glBindTexture (GL_TEXTURE_2D, retain_tex);
+  glColor3f (1, 1, 1);
+  {
+    GLfloat tw = w / (GLfloat) retain_tw;
+    GLfloat th = h / (GLfloat) retain_th;
+    glBegin (GL_QUADS);
+    glTexCoord2f (0,  0);  glVertex3f (0, 0, 0);
+    glTexCoord2f (tw, 0);  glVertex3f (1, 0, 0);
+    glTexCoord2f (tw, th); glVertex3f (1, 1, 0);
+    glTexCoord2f (0,  th); glVertex3f (0, 1, 0);
+    glEnd ();
+  }
+
+  glPopMatrix ();
+  glMatrixMode (GL_PROJECTION);
+  glPopMatrix ();
+  glPopAttrib ();
+  glClear (GL_DEPTH_BUFFER_BIT);
+}
+
+void
+xss_gl_frame_end (const char *progclass, int w, int h)
+{
+  if (!gl4es_ready || !retain_hack_p (progclass) || !retain_tex) return;
+  if (w != retain_w || h != retain_h) return;   /* mid-resize frame */
+
+  glPushAttrib (GL_ENABLE_BIT | GL_TEXTURE_BIT);
+  glEnable (GL_TEXTURE_2D);
+  glBindTexture (GL_TEXTURE_2D, retain_tex);
+  glCopyTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+  glPopAttrib ();
+  retain_primed = True;
 }
 
 #ifndef __EMSCRIPTEN__

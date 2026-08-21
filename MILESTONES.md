@@ -552,6 +552,34 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   invalid operation" natively (latched pre-existing error, trails
   unaffected).
 
+- **M8b ✅ flurry accumulates (driver-level retained framebuffer).**
+  Deeper sweep for cumulative-effect hacks: a call-graph scan of every
+  registered GL hack's real module draw entry (XSCREENSAVER_MODULE
+  macros remap names — draw_cow, draw_bubble3d...) for a reachable
+  glClear/self-restore, then manual triage of the 7 remaining
+  suspects (6 clear via function pointers or support files the scan
+  can't follow). Verdict: **flurry** is the one shipping GL hack that
+  composites frame N atop N-1 with NO clear and NO self-restore — it
+  fades the old frame with a translucent black rect and adds smoke
+  additively. It was silently degraded on BOTH targets (native shot:
+  0.7% lit thin streaks instead of dense glow; nobody noticed because
+  "colors present" = pass).
+  Fix: noof's own save/restore pattern, generalized at the port level.
+  New driver hooks xss_gl_frame_begin/end (weak no-ops; strong impls
+  in glx-sdl.c) bracket each GL hack frame; for hacks in the retain
+  list ({"Flurry"} by progclass), frame_begin redraws the saved
+  pow2 GL_RGB texture as a fullscreen quad (glPushAttrib + matrix
+  push/pop, all through gl4es so its state cache stays coherent) and
+  frame_end glCopyTexSubImage2D's the finished frame back. GL_RGB
+  capture is legal from any framebuffer (no alpha dependency); resize
+  re-creates the texture (trails reset, as upstream). Verified native
+  (dense soft ribbons, 13% lit vs 0.7%; noof/gears/smoke.sh
+  unaffected, all pass) and web (correct equilibrium glow + fade).
+  Known upstream characteristic, now observable on web: flurry caps
+  its fade at 0.2/frame but not its smoke brightness (pow(dt,0.75)*10),
+  so a throttled background tab (huge dt) saturates toward white;
+  it self-heals within ~1s once the tab is foregrounded.
+
 
 ## M3a (emscripten) -- delivered
 
