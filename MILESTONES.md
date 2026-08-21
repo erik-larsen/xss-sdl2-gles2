@@ -518,6 +518,40 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   checkout); build-web-m7 is a fresh emsdk-4.0.12 config. CI unaffected
   (fresh configure every run).
 
+## M8 — No-clear (trails) hacks
+
+- **M8a ✅ noof paints trails on the web.** Review of hacks that must
+  NOT clear between frames. GL hacks can't rely on a preserved
+  backbuffer anywhere modern (post-swap contents are undefined on
+  ANGLE/Metal, and the web canvas is composited away), and upstream
+  knows it: every GL hack clears per frame EXCEPT the ones that
+  save/restore a screenshot texture themselves (noof.c draws frame
+  N-1's texture, adds increments, glCopyTexSubImage2D's the result
+  back — sphereeversion does the same but isn't registered). The five
+  hacks with no glClear in their own file (b_lockglue, glschool,
+  polyhedra, sproingiewrap, stonerview) all clear in support files.
+  2D hacks are immune: the port's CPU surface persists.
+  So the entire affected shipping set was **noof**, and only on the
+  web: emscripten SDL created the WebGL context with alpha:false
+  (SDL_GL_ALPHA_SIZE 0), making the drawing buffer RGB — and GLES
+  forbids glCopyTexSubImage2D RGB→RGBA, so the capture failed with
+  INVALID_OPERATION every frame and the restore quad painted the
+  incomplete-texture black over frame N-1. (Native worked all along:
+  ANGLE hands out an RGBA8 surface regardless of ALPHA_SIZE 0.)
+  Fix (driver, web only): request SDL_GL_ALPHA_SIZE 8, and clamp_alpha()
+  before every swap — an alpha-masked glClear to 1 so the browser never
+  composites the page through the now-real alpha channel (that
+  invisible-canvas effect is exactly why alpha:false had been chosen
+  originally; every touched GL state is restored to its prior value to
+  keep gl4es's state cache in sync). Verified: noof accumulates dense
+  fans on web, console clean; gears/xmatrix/mirrorblob unchanged
+  (mirrorblob = the one shipping DST_ALPHA blender; web now sees real
+  dst alpha exactly like native, and its long black fade phases look
+  identical in before/after builds). Native rebuilt, gears smoke ok.
+  Cosmetic leftover: noof logs one startup "texture generation:
+  invalid operation" natively (latched pre-existing error, trails
+  unaffected).
+
 
 ## M3a (emscripten) -- delivered
 

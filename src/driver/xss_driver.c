@@ -227,6 +227,33 @@ static void alloc_surface(int w, int h)
                  GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 }
 
+#ifdef __EMSCRIPTEN__
+/* The WebGL drawing buffer has an alpha channel (see ALPHA_SIZE 8);
+ * whatever alpha the hack left there, the browser would composite the
+ * page through it. Force it to 1 with a masked clear before the swap.
+ * Every touched state is restored to its exact prior value so gl4es's
+ * state cache (which shadows GLES state for the GL hacks) stays in
+ * sync with reality. */
+static void clamp_alpha(void)
+{
+    GLboolean cm[4];
+    GLfloat   cc[4];
+    GLboolean scissor;
+    glGetBooleanv(GL_COLOR_WRITEMASK, cm);
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, cc);
+    scissor = glIsEnabled(GL_SCISSOR_TEST);
+
+    if (scissor) glDisable(GL_SCISSOR_TEST);
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glColorMask(cm[0], cm[1], cm[2], cm[3]);
+    glClearColor(cc[0], cc[1], cc[2], cc[3]);
+    if (scissor) glEnable(GL_SCISSOR_TEST);
+}
+#endif
+
 static void blit_surface(void)
 {
     glViewport(0, 0, g.win_w, g.win_h);
@@ -331,6 +358,9 @@ static void tick(void)
     if (!g.hack->gl_p)
         blit_surface();                /* 2D: upload CPU surface + quad */
     xss_gl_pre_swap();                 /* gl4es: flush batched geometry */
+#ifdef __EMSCRIPTEN__
+    clamp_alpha();                     /* keep the canvas opaque */
+#endif
     /* --shot reads back the final frame BEFORE the swap: the post-swap
      * back buffer is undefined (llvmpipe preserves it; ANGLE/Metal
      * returns a fresh black drawable). Pre-swap is also what makes the
@@ -430,13 +460,19 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
     SDL_GL_SetAttribute(SDL_GL_RED_SIZE,   8);
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE,  8);
-    /* 0 alpha bits: on emscripten this makes SDL request a WebGL
-     * context with alpha:false, so the canvas composites opaquely
-     * regardless of the framebuffer's alpha channel. (GL hacks render
-     * through gl4es into an internal FBO and leave the default-buffer
-     * alpha at 0, which an alpha:true canvas would treat as fully
-     * transparent -> invisible.) Native is unaffected. */
+#ifdef __EMSCRIPTEN__
+    /* 8 alpha bits: an alpha:false WebGL drawing buffer is RGB, and
+     * GLES forbids glCopyTexSubImage2D from an RGB framebuffer into
+     * an RGBA texture -- which is exactly how the no-clear trails
+     * hacks (noof, sphereeversion) preserve frame N under frame N+1.
+     * The old invisible-canvas problem with alpha:true (hacks leave
+     * framebuffer alpha at 0 and the browser composites the page
+     * through the canvas) is handled by clamp_alpha() before every
+     * swap. Native always got an RGBA8 surface regardless. */
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+#else
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+#endif
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     char title[256];

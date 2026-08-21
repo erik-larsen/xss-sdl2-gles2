@@ -73,6 +73,11 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
   white-on-black readback thresholds, GLES2 having no `glLogicOp`.
 - **zsh word-splitting**: use `${=VAR}` or run hacks individually; `sample
   <pid>` needs `/usr/bin/sample`; macOS has no `timeout`.
+- **Web GL context has alpha:8 + pre-swap alpha clamp** (M8a): needed so
+  no-clear trails hacks (noof) can glCopyTexSubImage2D from the drawing
+  buffer; don't set ALPHA_SIZE back to 0 on web, and don't remove
+  clamp_alpha() — without it the browser composites the page through
+  the canvas.
 
 ## Pending work (prioritized)
 
