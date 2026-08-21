@@ -230,6 +230,19 @@ void* NewGLState(void* shared_glstate, int es2only) {
         /*k = kh_put(tex, list, 0, &ret);
         glstate->texture.zero = tex = kh_value(list, k) = malloc(sizeof(gltexture_t));*/
         glstate->texture.zero = tex = calloc(1, sizeof(gltexture_t));
+#ifdef __EMSCRIPTEN__
+        /* PATCH(xss-sdl): WebGL cannot texture from the default texture
+           object (name 0): uploads to it fail with INVALID_OPERATION
+           and sampling it returns black. Desktop GL allows it, and
+           hacks that never call glGenTextures (discoball's ray
+           texture) rely on that. Back gl4es's zero-texture with a real
+           GLES name here so texture 0 behaves like desktop GL. */
+        {
+            LOAD_GLES(glGenTextures);
+            if (gles_glGenTextures)
+                gles_glGenTextures(1, &tex->glname);
+        }
+#endif
         tex->adjustxy[0] = tex->adjustxy[1] = 1.f;
         tex->mipmap_auto = (globals4es.automipmap==1);
         tex->mipmap_need = (globals4es.automipmap==1)?1:0;

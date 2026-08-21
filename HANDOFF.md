@@ -112,7 +112,14 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
 **Image hacks** now use the bundled CC0 landscape set (M10,
 `assets/images/` + provenance README; native reads the dir, web
 prefetches one image per page in the shell). Colour bars remain the
-no-image fallback.
+no-image fallback. Desktop-GL default-texture-0 use (discoball, cube21,
+raverhoop, ...) works on WebGL via the gl4es zero-texture patch (M10b).
+
+**Native follow-ups** (found in the M9 review, all native parity):
+boxfit/halo/lightning/moire2/rocks/strange blank-or-nearly at 30s;
+goop renders opaque (jwxyz lacks X11 plane-mask transparency);
+vermiculate accumulates very slowly; a global fps cap is a possible
+driver option.
 
 **Platform**
 - **Windows native build** — actively in progress (tip commit added

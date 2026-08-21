@@ -679,6 +679,27 @@ be a driver option).
   esper "enhances" Antelope Canyon, jigsaw puzzles a photo; gears
   unaffected). Native smoke.sh all-pass.
 
+- **M10b ✅ default-texture-0 works on WebGL (discoball's light
+  shafts).** discoball's atmospheric rays were missing on web: the
+  hack builds its ray gradient with glTexImage2D but never calls
+  glGenTextures — legal desktop-GL use of the default texture object
+  (id 0), which gl4es maps straight to real GLES name 0. Native GLES
+  has a usable default texture; **WebGL does not** (uploads to the
+  null texture fail, sampling it returns black), so the additive
+  textured ray quads contributed nothing. PATCH(xss-sdl) in gl4es
+  (glstate.c + a lazy backstop in texture_params.c realize_bound):
+  under emscripten, back the zero-texture with a real generated GLES
+  name. A dozen shipping hacks use implicit texture 0 (cube21's
+  sticker face, raverhoop, rubikblocks, boxed, cage, moebius, stairs,
+  lavalite, ...) — all benefit; verified discoball (91% coverage,
+  shafts + glow match native), raverhoop (1.2k colors), rubikblocks,
+  providence, glblur trails (delta 0.72).
+  Also triaged from the review: **goop's opaque blobs are native
+  parity** — its transparency is X11 plane-mask colormap trickery
+  (allocate_alpha_colors) that jwxyz doesn't implement; native renders
+  identically opaque. Added to native follow-ups (a jwxyz plane-mask
+  emulation would fix goop and friends everywhere).
+
 
 ## M3a (emscripten) -- delivered
 

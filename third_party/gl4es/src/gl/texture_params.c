@@ -712,6 +712,14 @@ void realize_bound(int TMU, GLenum target) {
     realize_active();
     LOAD_GLES(glBindTexture);
     gltexture_t *tex = glstate->texture.bound[TMU][what_target(target)];
+#ifdef __EMSCRIPTEN__
+    /* PATCH(xss-sdl): lazy backstop for the zero-texture real name --
+       see glstate.c. */
+    if (tex == glstate->texture.zero && tex->glname == 0) {
+        LOAD_GLES(glGenTextures);
+        gles_glGenTextures(1, &tex->glname);
+    }
+#endif
     GLuint t = tex->glname;
     DBG(printf("realize_bound(%d, %s), glsate->actual_tex2d[%d]=%u / %u\n", TMU, PrintEnum(target), TMU, glstate->actual_tex2d[TMU], t);)
 #ifdef TEXSTREAM
