@@ -15,9 +15,13 @@ style) with auto-screenshot thumbs from the harness.
   scripts/deploy-web.sh). Cards whose build is missing from <webdir>
   are rendered dimmed and unlinked, so the gallery can ship before the
   full wasm build does.
+- Card metadata (pretty label, one-line description, author/year):
+  parsed from the vendored upstream config XMLs
+  (third_party/xscreensaver/hacks/config/<hack>.xml).
 """
 
-import argparse, csv, os, re, sys
+import argparse, csv, json, os, re, sys
+import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -48,6 +52,53 @@ def registered_hacks():
     hacks["polyhedra"] = "GL"          # manual registration
     hacks.pop("name", None)            # function definitions, not hacks
     return hacks
+
+
+def hack_metadata(name):
+    """-> {label, desc, author, year} from the upstream config XML.
+
+    desc is the first prose paragraph of <_description> (URL-only lines
+    dropped); author/year come from its trailing "Written by X; YEAR."
+    Missing XML or fields -> empty strings.
+    """
+    meta = {"label": "", "desc": "", "author": "", "year": ""}
+    # executables named after the source file, XML after the module
+    xmlname = {"b_lockglue": "bubble3d",
+               "sproingiewrap": "sproingies"}.get(name, name)
+    path = os.path.join(ROOT, "third_party", "xscreensaver", "hacks",
+                        "config", f"{xmlname}.xml")
+    if not os.path.exists(path):
+        return meta
+    root = ET.parse(path).getroot()
+    meta["label"] = root.get("_label", "")
+    dnode = root.find("_description")
+    text = (dnode.text or "") if dnode is not None else ""
+    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    m = re.search(r"Written by\s+(.+?);\s*([0-9][-0-9,; ]*[0-9]|[0-9]{4})\.",
+                  text, re.S)
+    if m:
+        meta["author"] = re.sub(r"\s+", " ", m.group(1)).strip()
+        meta["year"] = m.group(2).strip()
+    for p in paras:
+        p = re.sub(r"\s+", " ", p)
+        # skip URL-only lines, the author line, and the "removed from
+        # the distribution as of 5.x" boilerplate on retired hacks
+        if re.match(r"(https?://|Written by)", p) or \
+           "was removed from the XScreenSaver distribution" in p:
+            continue
+        # drop trailing URLs / "Written by" if glued to the same paragraph
+        p = re.split(r"\s*(?:https?://\S+|Written by .*)$", p)[0].strip()
+        if p:
+            meta["desc"] = p
+            break
+    if not meta["desc"] and paras:
+        # only the retirement boilerplate exists (juggle, thornbird);
+        # keep its informative tail ("It has been replaced by ...")
+        p = re.sub(r"\s+", " ", paras[0])
+        p = re.sub(r"^This screen saver was removed.*?version \d+\.\d+\.\s*",
+                   "", p)
+        meta["desc"] = re.split(r"\s*Written by .*$", p)[0].strip()
+    return meta
 
 
 def main():
@@ -83,15 +134,21 @@ def main():
         elif not os.path.exists(thumb):
             print(f"warning: no screenshot for {name}", file=sys.stderr)
         built = os.path.exists(os.path.join(args.webdir, name, f"{name}.html"))
-        shown.append((name, klass, built))
+        meta = hack_metadata(name)
+        if not meta["label"]:
+            print(f"warning: no config XML metadata for {name}",
+                  file=sys.stderr)
+        shown.append((name, klass, built, meta))
 
     items = ",\n    ".join(
-        f'["{n}","{k}",{1 if b else 0}]' for n, k, b in shown)
+        json.dumps([n, k, 1 if b else 0, m["label"] or n, m["desc"],
+                    m["author"], m["year"]], ensure_ascii=False)
+        for n, k, b, m in shown)
     html = TEMPLATE.replace("/*HACKS*/", items) \
                    .replace("/*COUNT*/", str(len(shown)))
     with open(os.path.join(args.webdir, "index.html"), "w") as f:
         f.write(html)
-    nb = sum(1 for _, _, b in shown if b)
+    nb = sum(1 for _, _, b, _ in shown if b)
     print(f"gallery: {len(shown)} hacks ({nb} with web builds) -> "
           f"{args.webdir}/index.html")
 
@@ -123,9 +180,13 @@ TEMPLATE = """<!DOCTYPE html>
   a.card:hover { transform:translateY(-3px); border-color:var(--accent); }
   .card.nobuild { opacity:.45; }
   .thumb { aspect-ratio:4/3; background:#000 center/cover no-repeat; }
-  .meta { padding:10px 12px; display:flex; align-items:baseline; justify-content:space-between; }
+  .meta { padding:10px 12px 4px; display:flex; align-items:baseline; justify-content:space-between; }
   .name { font-size:14px; font-weight:600; }
-  .tag { font-size:10px; color:var(--dim); border:1px solid #2a2a3a; padding:1px 6px; border-radius:6px; }
+  .tag { font-size:10px; color:var(--dim); border:1px solid #2a2a3a; padding:1px 6px; border-radius:6px; white-space:nowrap; }
+  .desc { padding:0 12px; color:var(--dim); font-size:12px; line-height:1.45; flex:1;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .by { padding:6px 12px 10px; color:var(--dim); font-size:11px; opacity:.75;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   footer { text-align:center; color:var(--dim); font-size:12px; padding:24px; line-height:1.6; }
 </style>
 </head>
@@ -153,14 +214,18 @@ TEMPLATE = """<!DOCTYPE html>
     /*HACKS*/
   ];
   var g = document.getElementById('grid');
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   hacks.forEach(function(h){
-    var name=h[0], klass=h[1], built=h[2];
+    var name=h[0], klass=h[1], built=h[2], label=h[3], desc=h[4], author=h[5], year=h[6];
     var el=document.createElement(built?'a':'div');
     el.className='card'+(built?'':' nobuild'); el.dataset.k=klass;
     if(built) el.href=name+'/'+name+'.html';
+    if(desc) el.title=desc;
     el.innerHTML='<div class="thumb" style="background-image:url(\\'shots/'+name+'.jpg\\')"></div>'+
-      '<div class="meta"><div class="name">'+name+'</div><div class="tag">'+klass+
-      (built?'':' &middot; native only')+'</div></div>';
+      '<div class="meta"><div class="name">'+esc(label)+'</div><div class="tag">'+klass+
+      (built?'':' &middot; native only')+'</div></div>'+
+      (desc?'<div class="desc">'+esc(desc)+'</div>':'')+
+      (author?'<div class="by">'+esc(author)+(year?', '+esc(year):'')+'</div>':'');
     g.appendChild(el);
   });
   document.querySelectorAll('.filters button').forEach(function(b){

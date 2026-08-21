@@ -455,6 +455,27 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   the line-clip + quasicrystal patches DO affect web -- CI's web job
   rebuilds fresh on push, so the Pages redeploy picks them up.
 
+## M7 — Gallery metadata & settings
+
+- **M7a ✅ gallery card metadata (tier 1).** Vendored the upstream
+  config XMLs (`third_party/xscreensaver/hacks/config/`, 314 files,
+  ~1.3MB, from Zygo/xscreensaver master == the vendored 6.15) — they
+  also drive the future web settings panel (tier 2). gen_gallery.py
+  now parses each hack's XML: `_label` (pretty card name — "Möbius
+  Gears", "Bubble 3D"), the first prose paragraph of `_description`
+  (2-line-clamped blurb + full text as tooltip), and author/year from
+  the trailing "Written by X; YEAR." All 233 shipping hacks have
+  complete metadata. Wrinkles handled: b_lockglue/sproingiewrap
+  executables map to bubble3d/sproingies XMLs; 23 retired hacks lead
+  with "removed from the distribution" boilerplate (skipped; juggle +
+  thornbird have ONLY boilerplate, so the informative tail is kept).
+  Card data is emitted with json.dumps and HTML-escaped client-side.
+  Remaining tiers: (2) live web settings panel from the XML sliders/
+  booleans via the existing xss_web_args query-string hook, (3) native
+  --help option tables.
+- Also fixed en route: removed the stale "BLOCKED on image grab" list
+  in cmake/batch2-glhacks.cmake (those 10 hacks shipped in M6f).
+
 
 ## M3a (emscripten) -- delivered
 

@@ -90,6 +90,5 @@ xss_add_glhack(voronoi fps-gl glsl-utils texfont)
 # BLOCKED molecule: needs molecules.h, generated upstream from PDB data
 # not present in the vendored tree (hacks/glx/molecules.sh). Defer w/ M6
 # assets.
-# BLOCKED on image grab (load_image_async; M6 image set): antspotlight carousel esper flipscreen3d gflux flipflop glslideshow jigsaw mirrorblob photopile
 # BLOCKED xshadertoy: android_read_asset_file (needs shader
 # asset bundling; M6).
