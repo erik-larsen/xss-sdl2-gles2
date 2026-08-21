@@ -1,99 +1,145 @@
-# xss-sdl — xscreensaver → SDL2 + OpenGL ES 2.0
+# xss-sdl2-gles2 — xscreensaver → SDL2 + OpenGL ES 2.0
 
 ![screenshot](media/screenshot.png)
 
-Port of [xscreensaver](https://github.com/Zygo/xscreensaver) hacks to
-SDL2 + GLES2, building natively for Linux/macOS/Windows and for the web
-via Emscripten. One executable (or web page) per hack.
+A port of [xscreensaver](https://github.com/Zygo/xscreensaver)'s screen
+hacks to **SDL2 + OpenGL ES 2.0**, building natively for Linux / macOS /
+Windows and for the **web** via Emscripten/WebAssembly. One executable
+(or one web page) per hack, compiled from the **unmodified** upstream
+hack source.
+
+**▶ Live gallery: https://erik-larsen.github.io/xss-sdl2-gles2/** — all
+hacks running in the browser (click a thumbnail; press `Esc`/`Q` to
+exit).
+
+## Status
+
+**233 / 233 shipping hacks pass** — every wired hack renders correctly,
+verified headlessly (clean exit, non-blank, frame-to-frame motion) and
+by eye, natively on macOS/ANGLE and as WebAssembly. `tests/STATUS.md`
+tracks per-hack state; `MILESTONES.md` has the full development log.
+
+| Area | State |
+|---|---|
+| 2D pipeline (jwxyz → CPU RGBA → GLES2 blit) | done |
+| GL pipeline (gl4es + glues → GLES2) | done |
+| Emscripten / WebAssembly build (all hacks) | done |
+| Thumbnail gallery + GitHub Pages deploy | done |
+| Real fonts (stb_truetype + Liberation subset) | done |
+| textclient hacks (bundled text, no subprocess) | done |
+| image-grab hacks (SMPTE colour-bars source) | done |
+| Native CI: Linux ✓ · macOS ✓ · Windows | Windows WIP |
+
+**Deferred** (a handful of ~250 upstream hacks): the analogtv family
+(apple2, xanalogtv, bsod) and phosphor's terminal glyph pipeline;
+`molecule` (needs upstream PDB data), `xshadertoy` (shader asset
+bundling), `noseguy` (image assets), `extrusion`. See `MILESTONES.md`.
 
 ## Architecture
 
 ```
-            hack .c (unmodified xscreensaver source)
-        ┌─────────┴─────────┐
-   2D hacks              GL hacks
-        │                    │
-  jwxyz-image          GL 1.x calls ──► gl4es ─► GLES2
-   (CPU RGBA)          GLU calls ──► glues (tess/quadrics/mipmap) ─► gl4es
-        │
-        ▼
- CPU framebuffer ─► GLES2 textured-quad blit
-        └─────────┬─────────┘
-   SDL2 driver: single GLES-only context path (sgi-demos pattern)
-   emscripten ifdefs: main loop, asset preload, title quirk only
+                  hack .c (unmodified xscreensaver source)
+             ┌───────────────┴────────────────┐
+        2D hacks                            GL hacks
+             │                         GL 1.x/2.x    GLU calls
+       jwxyz-image                          │            │
+      (draws into a                         │      glues (tess /
+       CPU RGBA buffer)                      │     quadrics / mipmap)
+             │                              └──────┬─────┘
+             │                                   gl4es
+             │                          (translates GL → GLES2,
+             │                        renders into its own FBO texture)
+             ▼                                    │
+   driver uploads the buffer            gl4es blits its FBO
+   and draws one textured quad          to the window at swap
+             │                        (via the pre_swap hook)
+             └───────────────┬────────────────┘
+             SDL2 driver — one GLES2 context, window swap
+        (sgi-demos pattern; emscripten shares the tick() loop)
 ```
 
-## Status (M1a complete)
+Both sides render into a texture and blit it to the window; they differ
+only in who owns that texture — the driver's CPU-uploaded surface for 2D
+hacks, gl4es's internal FBO for GL hacks.
 
-- [x] SDL2 driver, GLES2-only context (sgi-demos `sdl_framebuffer.c` pattern)
-- [x] CPU framebuffer → GLES2 quad blit (NPOT, y-flip, RGBA)
-- [x] `tick()`-shaped main loop shared by native + emscripten builds
-- [x] Harness primitives: `--frames N`, `--shot out.ppm`, `--fps`
-- [x] `testpattern` hack validates orientation/channels/animation headlessly
-- [x] M1b: jwxyz-image adapter; real 2D hacks running unmodified:
-      deco, greynetic, attraction, interference, moire
-      (screenshots in docs/screenshots/, smoke suite in tests/smoke.sh)
-- [x] M2a: GL pipeline live (gl4es + glues); gears rendering
-- [x] M2b: hypertorus, glmatrix, lament, polyhedra verified; bouncingcow known-issue (gl4es dlist+interleaved-arrays, black render)
-- [ ] M3: emscripten builds + per-hack pages
-- [ ] M4: Windows/macOS builds + CI
-- [ ] M5: full hack rollout + automated harness
-- [ ] M6: problem hacks, text/image/font assets
+The port supplies platform hooks the mobile (Android/iOS) code path
+already expects — text rendering (`src/port/jwxyz-font.c`, stb_truetype),
+a text source (`textclient-sdl.c`), and an image source
+(`grabclient-sdl.c`) — so the hacks compile unmodified. Vendored-library
+edits are minimal and all tagged `PATCH(xss-sdl)`.
 
-## Porting notes (M1b findings)
+## Build & run
 
-- **Platform identity**: the tree's portability gate is
-  `HAVE_COCOA || HAVE_ANDROID` -> jwxyz, so this port defines
-  `HAVE_ANDROID` (like the Android build) and compiles zero JNI files.
-  Introducing a first-class `HAVE_SDL` gate is future cleanup.
-- **Symbol hiding is mandatory on Linux**: jwxyz defines real-Xlib
-  names; SDL2 links real libX11. Without `-fvisibility=hidden`, SDL's
-  own Xlib calls bind to jwxyz and crash (`CMAKE_C_VISIBILITY_PRESET`).
-- **Vendored patches** (both in `jwxyz/jwxyz-image.c`, marked
-  `PATCH(xss-sdl)`): upstream stubs `draw_arc` and `FillPolygon` in
-  image mode; we delegate to raster implementations in
-  `src/port/jwxyz-arcs.c` (tessellate -> scanline spans via
-  XFillRectangle, outlines via XDrawLines). This unblocked
-  `attraction` and every other XFillArc-based hack.
-- Fonts are metric-sane stubs until M6; hacks that draw text will run
-  but render no glyphs.
-
-## Build & run (Linux)
+### Native (Linux)
 
 ```sh
-apt install cmake libsdl2-dev libgles2-mesa-dev
-cmake -B build && cmake --build build
-./build/testpattern                  # interactive (Esc/q quits)
+sudo apt install cmake ninja-build libsdl2-dev \
+  libgl1-mesa-dev libglu1-mesa-dev libgles-dev zlib1g-dev libpng-dev
+cmake -B build -G Ninja && cmake --build build
+./build/gears                     # interactive; Esc/Q quits
 ```
 
-Headless smoke test (CI-style):
+### Native (macOS)
 
 ```sh
-apt install xvfb
-LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a \
-  ./build/testpattern --frames 60 --shot shot.ppm --fps
+brew install cmake ninja sdl2 libpng
+cmake -B build -G Ninja && cmake --build build
+./build/gears
 ```
 
-Expected `shot.ppm`: SMPTE-ish color bars (top), grayscale ramp (middle),
-animated plasma (bottom), 1px red border, green 20px square in the
-top-left corner, white crosshair at center. See `docs/testpattern.png`.
+macOS links a vendored ANGLE for GLES2 (`third_party/angle/lib-mac`); the
+driver selects ANGLE's **Metal** backend automatically (much faster than
+its default GL-on-Metal path).
 
-## Driver CLI (all hacks)
+### Web (Emscripten)
+
+```sh
+emcmake cmake -B build-web -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build-web
+sh scripts/deploy-web.sh build-web        # assembles web/ + gallery
+cd web && python3 -m http.server          # then open localhost:8000
+```
+
+The web build stays at `-O2` (`-O3` miscompiles gl4es) and strips DWARF
+(`-g0`) — debug info was ~77% of each `.wasm`.
+
+### Driver CLI (every hack)
 
 ```
 --width N --height N    window size (default 800x600)
 --frames N              exit after N frames
---shot PATH.ppm         write final rendered frame (GPU readback)
+--shot PATH.ppm         write the final rendered frame (GPU readback)
 --fps                   print fps once per second
+```
+
+Plus each hack's own upstream options (`-speed`, `-count`, …), parsed
+from its source; on the web these can also come from the page's query
+string.
+
+### Headless smoke tests
+
+```sh
+sh tests/smoke.sh build            # native (macOS direct; Linux xvfb)
+python3 tests/harness.py --build build   # full per-hack status sweep
+sh tests/smoke-web.sh build-web    # browser (headless Chrome)
 ```
 
 ## Layout
 
 ```
-src/driver/    SDL2/GLES2 driver (xss_driver.[ch])
-src/hacks/     per-hack entry points
-docs/          reference material, verification screenshots
-MILESTONES.md  plan + per-milestone status
+src/driver/        SDL2/GLES2 driver (xss_driver.[ch])
+src/port/          jwxyz platform layer: fonts, text, image, GLX shims
+src/web/           custom emscripten shell (full-window, no branding)
+third_party/       xscreensaver, gl4es, glues, ANGLE, stb_truetype, font
+cmake/             generated hack-registration includes
+scripts/           gallery + font-embed + dep-generation tooling
+tests/             smoke suites + STATUS sheet + harness
+docs/, MILESTONES.md   design notes, per-milestone development log
 ```
 
-- [x] M3a: emscripten build; testpattern + deco verified in headless Chromium; gears known-issue (intermittent blank via gl4es-on-WebGL)
+## Licenses
+
+This port's scaffolding is Apache-2.0 (`LICENSE`). Vendored components
+keep their own: xscreensaver hacks (BSD-style, © Jamie Zawinski et al.),
+gl4es (MIT), glues (SGI Free Software License B), stb_truetype (public
+domain), Liberation fonts (SIL OFL 1.1), ANGLE (BSD-style).
