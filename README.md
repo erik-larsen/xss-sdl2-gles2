@@ -1,4 +1,4 @@
-# xss-sdl2-gles2 — xscreensaver → SDL2 + OpenGL ES 2.0
+# xss-sdl2-gles2 — [xscreensaver → SDL2 + OpenGL ES2](https://erik-larsen.github.io/xss-sdl2-gles2/)
 
 ![screenshot](media/screenshot.png)
 
