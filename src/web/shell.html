@@ -342,6 +342,17 @@
       });
     });
 
+    // Esc leaves the hack page: back if there is history, else the
+    // gallery index. Captured before SDL's handlers so the wasm side
+    // never sees it (Q still freezes the hack in place).
+    window.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || panel.contains(e.target)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (history.length > 1) history.back();
+      else location.href = '../index.html';
+    }, true);
+
     // The gear only appears while the pointer is moving (screensaver!).
     var fade = null;
     window.addEventListener('mousemove', function () {

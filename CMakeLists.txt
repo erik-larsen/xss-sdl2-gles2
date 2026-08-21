@@ -43,8 +43,16 @@ endif()
 # ---------------------------------------------------------------- SDL2
 if(EMSCRIPTEN)
   add_compile_options(-sUSE_SDL=2 -sUSE_LIBPNG=1)
+  # GL_MAX_TEMP_BUFFER_SIZE: gl4es batches immediate-mode geometry into
+  # large client-side arrays; emscripten's FULL_ES2 path copies them
+  # through a temp VBO whose default max (2MB) is too small for whole-
+  # frame batches, silently breaking draws. STACK_SIZE: emscripten's
+  # default 64KB C stack vs 8MB native. (Both learned the hard way in
+  # the sibling rss-sdl2-gles2 port.)
   add_link_options(-sUSE_SDL=2 -sUSE_LIBPNG=1 -sALLOW_MEMORY_GROWTH=1
                    -sFULL_ES2=1 -sMINIFY_HTML=0
+                   -sGL_MAX_TEMP_BUFFER_SIZE=33554432
+                   -sSTACK_SIZE=8388608
                    --shell-file ${CMAKE_SOURCE_DIR}/src/web/shell.html)
   # NB: emscripten optimization comes from CMAKE_BUILD_TYPE. Use
   # RelWithDebInfo (-O2); -O3 miscompiles gl4es (gears renders blank).

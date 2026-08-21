@@ -7,3 +7,4 @@ node_modules/
 # thumbnails + index are committed so Pages can deploy them directly
 web/*/
 !web/shots/
+scripts/__pycache__/

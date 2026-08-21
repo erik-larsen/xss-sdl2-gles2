@@ -4,7 +4,11 @@
     {
       "name": "web-gallery",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8901", "-d", "web"],
+      "runtimeArgs": [
+        "scripts/serve-web.py",
+        "8901",
+        "web"
+      ],
       "port": 8901
     }
   ]

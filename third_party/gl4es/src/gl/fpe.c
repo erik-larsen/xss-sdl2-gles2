@@ -1444,6 +1444,25 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
             enabled = 0;
         }
         // enable / disable Array if needed
+#ifdef __EMSCRIPTEN__
+        /* PATCH(xss-sdl): third flavour of the FULL_ES2 cache-desync
+           (see the ARRAY_BUFFER patch below and the ELEMENT_ARRAY
+           patch in buffers.c realize_bufferIndex). emscripten's
+           client-array emulation toggles the REAL attrib-array enables
+           behind this shadow cache when it uploads client pointers, so
+           a slot gl4es believes is disabled can stay enabled with a
+           stale emulation buffer bound. The constant glVertexAttrib4fv
+           below is then ignored -- color/normal attribs read zeros and
+           lit hacks render pure black (cube21, papercube, hydrostat,
+           klein, ...). Always issue the real enable/disable call. */
+        if(v->enabled != enabled || (v->enabled && w->divisor))
+            dirty = 1;
+        v->enabled = (w->divisor)?0:enabled;
+        if(v->enabled)
+            gles_glEnableVertexAttribArray(i);
+        else
+            gles_glDisableVertexAttribArray(i);
+#else
         if(v->enabled != enabled || (v->enabled && w->divisor)) {
             dirty = 1;
             v->enabled = (w->divisor)?0:enabled;
@@ -1453,6 +1472,7 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
             else
                 gles_glDisableVertexAttribArray(i);
         }
+#endif
         // check if new value has to be sent to hardware
         if(v->enabled) {
             // array case
@@ -1523,8 +1543,15 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
                     LOAD_GLES2(glBindBuffer);
                     gles_glBindBuffer(GL_ARRAY_BUFFER, 0);
                     glstate->bind_buffer.array = 0;
-                } else
-                    bindBuffer(GL_ARRAY_BUFFER, v->real_buffer);
+                } else {
+                    /* PATCH(xss-sdl): same forced-real-bind as the
+                       client case above -- FULL_ES2 rebinds the real
+                       ARRAY_BUFFER behind gl4es's cache, so a cached
+                       "already bound" can be stale. */
+                    LOAD_GLES2(glBindBuffer);
+                    gles_glBindBuffer(GL_ARRAY_BUFFER, v->real_buffer);
+                    glstate->bind_buffer.array = v->real_buffer;
+                }
 #else
                 bindBuffer(GL_ARRAY_BUFFER, v->real_buffer);
 #endif

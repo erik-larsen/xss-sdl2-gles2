@@ -194,14 +194,20 @@ xss_gl_frame_end (const char *progclass, int w, int h)
   retain_primed = True;
 }
 
-#ifndef __EMSCRIPTEN__
 /* Strong overrides of the driver's weak swap hooks. gl4es batches
  * immediate-mode geometry; pre_swap flushes it (and blits gl4es's
  * internal FBO when in use), post_swap rebinds that FBO. Without the
  * flush, GL hacks render opaque black on ANGLE/Metal (llvmpipe was
- * forgiving, which is why Linux never showed it). Native-only for now:
- * the web path was verified working without these, so it stays
- * untouched until it can be re-verified with them. */
+ * forgiving, which is why Linux never showed it).
+ *
+ * The web build needs this flush just as much: gl4es interposes ALL
+ * GL symbols in these binaries (the driver's own calls included), so
+ * with no pre-swap flush a hack renders only if its state churn
+ * happens to trip gl4es's internal flush heuristics. Steady-state
+ * immediate-mode hacks (cube21, papercube, hydrostat, ...) batched
+ * forever and stayed blank -- this was previously #ifndef
+ * __EMSCRIPTEN__ under a "verified working without" note that only
+ * held for the lucky subset. */
 extern void gl4es_pre_swap (void);
 extern void gl4es_post_swap (void);
 void
@@ -214,7 +220,6 @@ xss_gl_post_swap (void)
 {
   if (gl4es_ready) gl4es_post_swap ();
 }
-#endif
 
 /* Does nothing -- the SDL driver owns the (single) context. */
 void

@@ -728,12 +728,27 @@ GLuint wantBufferIndex(GLuint buffer)
 void realize_bufferIndex()
 {
     LOAD_GLES(glBindBuffer);
+#ifdef __EMSCRIPTEN__
+    /* PATCH(xss-sdl): emscripten's FULL_ES2 client-array emulation
+       rebinds the REAL ELEMENT_ARRAY_BUFFER behind this shadow cache
+       when it uploads client-side index arrays. When the cache then
+       matches want_index the real bind is skipped and the two sides
+       disagree: gl4es submits VBO-relative index offsets while WebGL
+       has no (or the wrong) index buffer bound, so the offsets are
+       misread as heap pointers -- typically all-zero indices, i.e.
+       fully degenerate geometry (cube21, papercube, hydrostat, ...
+       drew but produced no fragments). Always issue the real bind. */
+    glstate->bind_buffer.index = glstate->bind_buffer.want_index;
+    gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->bind_buffer.index);
+    glstate->bind_buffer.used = (glstate->bind_buffer.index && glstate->bind_buffer.array)?1:0;
+#else
     if(glstate->bind_buffer.index != glstate->bind_buffer.want_index) {
         glstate->bind_buffer.index = glstate->bind_buffer.want_index;
         gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->bind_buffer.index);
         DBG(printf("Bind buffer %d to GL_ELEMENT_ARRAY_BUFFER\n", glstate->bind_buffer.index);)
         glstate->bind_buffer.used = (glstate->bind_buffer.index && glstate->bind_buffer.array)?1:0;
     }
+#endif
 }
 
 void deleteSingleBuffer(GLuint buffer) {

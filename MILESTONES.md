@@ -580,6 +580,81 @@ downloadable repo snapshot + evidence (screenshots/logs) + status update.
   so a throttled background tab (huge dt) saturates toward white;
   it self-heals within ~1s once the tab is foregrounded.
 
+## M9 — Web rendering audit (user gallery review -> fixes -> full sweep)
+
+A full manual review of the live gallery surfaced ~25 broken-on-web
+hacks. Root-caused to FOUR independent web-only defects — none of them
+per-hack bugs — plus the discovery that "233/233, 0 blank as
+WebAssembly" had never actually been verified: tests/smoke-web.sh only
+samples 8 hand-picked hacks; the full per-hack sweep existed natively
+only.
+
+- **M9a ✅ hacks no longer init against a 0x0 surface.** On web, SDL
+  reports a 0x0 drawable before the canvas is laid out, and the driver
+  ran hack->init with it. reshape()-driven hacks recovered on the
+  first resize event (why most of the gallery worked); hacks that size
+  themselves once at init broke permanently — jigsaw wasm-trapped on
+  an integer divide-by-zero in its grid math, and every grab-ximage
+  hack grabbed a 0x0 pixmap (jigsaw/antspotlight/esper/gflux/
+  mirrorblob/slidescreen/flipscreen3d "no image"; decayscreen/ripples/
+  moire2/halo 2D blanks). Fix: driver sizes the surface from the
+  canvas CSS size before init (surface only — an SDL_SetWindowSize
+  there was flaky; SDL's own resize event syncs the backing store
+  moments later at the same size).
+- **M9b ✅ gl4es pre-swap flush enabled on web.** The gl4es_pre_swap/
+  post_swap hooks were #ifndef __EMSCRIPTEN__ under a "web verified
+  working without these" note — which only ever held for hacks whose
+  state churn tripped gl4es's internal flush heuristics. gl4es
+  interposes ALL GL symbols in hack binaries (the driver's own calls
+  included), so steady-state immediate-mode hacks batched geometry
+  forever and rendered nothing: papercube, hydrostat, cube21,
+  etruscanvenus, hexstrut, klein, projectiveplane, raverhoop,
+  romanboy, rubikblocks... It also explains glmatrix regressing after
+  M8a (clamp_alpha perturbed the lucky flush cadence). Hooks now run
+  on web too.
+- **M9c ✅ two more gl4es/FULL_ES2 cache-desync patches** (same family
+  as the M3a client-array patch): emscripten's FULL_ES2 emulation
+  flips REAL attrib-array enables and ARRAY/ELEMENT_ARRAY_BUFFER
+  bindings behind gl4es's shadow caches, so cached "already correct"
+  skips left stale state — constant color/normal attribs read zeros
+  (lit hacks pure black), index offsets misread as heap pointers
+  (all-zero indices, fully degenerate draws). PATCH(xss-sdl) in
+  fpe.c (always issue real enable/disable + real ARRAY_BUFFER bind)
+  and buffers.c realize_bufferIndex (always issue the real
+  ELEMENT_ARRAY_BUFFER bind). Plus emscripten link flags learned from
+  the sibling rss-sdl2-gles2 port: -sGL_MAX_TEMP_BUFFER_SIZE=32MB
+  (FULL_ES2's 2MB temp-VBO cap silently breaks whole-frame client
+  arrays) and -sSTACK_SIZE=8MB (native-parity C stack).
+- **M9d ✅ full-gallery web sweep is now a committed tool.**
+  tests/sweep-web.sh runs tests/verify-web.js over EVERY built page
+  (watchdog-killed; macOS has no timeout(1)) and writes
+  tests/STATUS-web.tsv. Result on the fixed build: **228/234
+  non-blank**; the 6 failures (boxfit, halo, lightning, moire2,
+  rocks, strange) reproduce IDENTICALLY in 30s native runs — they are
+  pre-existing 2D issues (blank-after-startup / flash-phase), not web
+  defects. Tracked below as native follow-ups.
+- **M9e ✅ shell: Esc navigates back** (history.back(), else the
+  gallery index), captured before SDL so the hack doesn't just freeze;
+  Q still stops in place.
+- **M9f ✅ thumbnail quality.** 65 gallery thumbs were near-black
+  (captured too early). Two-stage fix: (1) re-shot at ~30s of hack
+  time natively (32 recovered); (2) scripts/thumb-web.js — a generic
+  best-of capturer (any URL, works for rss-sdl2-gles2 too): samples
+  the page every --interval for --duration, scores shots by distinct
+  quantized colors (tie-break: non-black coverage), keeps the running
+  winner, stops early once --good-colors/--good-coverage are met.
+  Debugging note for future sessions: the in-app browser pane throttles
+  requestAnimationFrame to ~0 when its window is hidden/occluded —
+  interactive "still black" observations there are unreliable; use
+  headless verify-web.js/sweep-web.sh for rendering verdicts.
+
+Native follow-ups (pre-existing, found by the audit): boxfit/halo/
+lightning/moire2/rocks/strange render blank-or-nearly at 30s natively
+too; vermiculate accumulates extremely slowly natively; speedmine's
+pacing worth a look (driver honors hack delay; a global fps cap could
+be a driver option). Feature queue: bundled public-domain landscape
+image set for the grab hacks (replaces SMPTE bars).
+
 
 ## M3a (emscripten) -- delivered
 

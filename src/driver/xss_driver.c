@@ -26,6 +26,7 @@
 
 #ifdef __EMSCRIPTEN__
 # include <emscripten.h>
+# include <emscripten/html5.h>
 
 /* %XX / '+' decode in place (query-string values, e.g. -text strings). */
 static void
@@ -511,6 +512,26 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
     glClearColor(0, 0, 0, 1);
     init_blit();
     SDL_GL_GetDrawableSize(g.window, &g.win_w, &g.win_h);
+#ifdef __EMSCRIPTEN__
+    /* At startup the canvas may not be laid out yet: SDL reports a 0x0
+     * drawable, and the hack would init against a 0x0 surface. Hacks
+     * that size themselves once at init break permanently -- jigsaw's
+     * grid math divides by zero, grab-ximage grabs a 0x0 pixmap
+     * (jigsaw, antspotlight, ...), papercube/hydrostat stay blank --
+     * while reshape()-driven hacks recover on the first resize event.
+     * Size the window from the page viewport before the hack sees it. */
+    if (g.win_w <= 0 || g.win_h <= 0) {
+        double cw = 0, ch = 0;
+        emscripten_get_element_css_size("#canvas", &cw, &ch);
+        if (cw < 1 || ch < 1) { cw = req_w; ch = req_h; }
+        /* Size the surface only -- SDL's own resize event arrives right
+         * after layout at this same CSS size and syncs the canvas
+         * backing store. (Calling SDL_SetWindowSize here instead was
+         * flaky: the main loop sometimes never started.) */
+        g.win_w = (int)cw;
+        g.win_h = (int)ch;
+    }
+#endif
     printf("INFO: drawable: %dx%d\n", g.win_w, g.win_h);
     alloc_surface(g.win_w, g.win_h);
 

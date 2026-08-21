@@ -83,6 +83,16 @@ CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
   (xss_gl_frame_begin/end in glx-sdl.c, retain list keyed by
   progclass). Any future hack that composites over the previous frame
   without clearing goes in that list.
+- **Web rendering verdicts: use headless, never the browser pane**
+  (M9): the in-app pane throttles rAF to ~0 when occluded — "still
+  black" there proves nothing. `tests/sweep-web.sh` sweeps every built
+  page into tests/STATUS-web.tsv; `tests/verify-web.js` for one page.
+- **gl4es on web needs the pre-swap flush + FULL_ES2 desync patches**
+  (M9b/M9c): gl4es interposes ALL GL symbols in GL-hack binaries, and
+  emscripten's FULL_ES2 flips real GL state behind gl4es's shadow
+  caches. Don't re-guard xss_gl_pre_swap with #ifndef __EMSCRIPTEN__,
+  and keep the PATCH(xss-sdl) blocks in third_party/gl4es (fpe.c,
+  buffers.c) + the -sGL_MAX_TEMP_BUFFER_SIZE/-sSTACK_SIZE link flags.
 
 ## Pending work (prioritized)
 
