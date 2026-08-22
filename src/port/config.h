@@ -36,6 +36,17 @@ xss_strcasestr (const char *h, const char *n)
   return 0;
 }
 #define strcasestr xss_strcasestr
+
+/* MinGW's CRT has no POSIX setenv() either. _putenv_s() is the
+ * equivalent; the "don't clobber" flag becomes an explicit lookup. */
+#include <stdlib.h>
+static inline int
+xss_setenv (const char *key, const char *val, int overwrite)
+{
+  if (!overwrite && getenv (key)) return 0;
+  return _putenv_s (key, val);
+}
+#define setenv xss_setenv
 #endif
 
 #endif

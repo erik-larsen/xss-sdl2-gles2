@@ -97,10 +97,16 @@
  * glut.h or gl.h.
  */
 #if defined(_WIN32) && !defined(APIENTRY) && !defined(__CYGWIN__)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN 1
-#endif
-#include <windows.h>
+/* PATCH(xss-sdl): mesa drags in the whole of <windows.h> here just to
+ * pick up APIENTRY. That is a landmine in this tree: jwxyz.h has
+ * already defined the X11 event-mask macros, and windows.h has struct
+ * members by those names -- <processthreadsapi.h>'s "ULONG ControlMask;"
+ * expanded to "ULONG (1<<2);" and took the MSYS2 build down. Define the
+ * one token the header actually needs. Nothing else here wants
+ * windows.h either: the wgl prototypes below come from mesa_wgl.h,
+ * which is an empty stub in this snapshot (this port reaches ANGLE
+ * through EGL and calls no wgl entry point). */
+#define APIENTRY __stdcall
 #endif
 
 #if defined(_WIN32) && !defined(_WINGDI_) && !defined(_WIN32_WCE) \
