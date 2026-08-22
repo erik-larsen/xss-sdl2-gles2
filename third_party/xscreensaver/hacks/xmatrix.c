@@ -56,7 +56,12 @@
 #include "textclient.h"
 #include "ximage-loader.h"
 #include <stdio.h>
-#include <sys/wait.h>
+#ifndef _WIN32
+/* PATCH(xss-sdl): MinGW has no <sys/wait.h>, and nothing in this file
+ * needs it -- the subprocess lives in textclient, which this port
+ * stubs out. */
+# include <sys/wait.h>
+#endif
 
 #ifndef HAVE_JWXYZ
 # include <X11/Intrinsic.h>
