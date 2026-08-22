@@ -198,7 +198,12 @@ jobs:
         if: steps.angle.outputs.present == 'true'
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build build -j"$(nproc)"
+          # -k 0 (keep going after a failure): Windows is the WIP
+          # platform, and the port is being brought up one portability
+          # fix at a time. One run that lists every remaining error is
+          # worth far more than a round trip per file. The step still
+          # fails -- ninja's exit status is unchanged.
+          cmake --build build -j"$(nproc)" -- -k 0
 
       - name: Package (exes + ANGLE + SDL2 runtime DLLs)
         if: steps.angle.outputs.present == 'true'

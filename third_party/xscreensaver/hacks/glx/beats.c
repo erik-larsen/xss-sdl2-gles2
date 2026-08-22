@@ -280,7 +280,14 @@ draw_beats (ModeInfo *mi)
     }
     blurFrac = sin((1 - (float) timeDelta / deltaLimit) * M_PI_2) * ballAlpha;
     tv = tvOrig;
-    now = localtime (&tv.tv_sec); /* This seems to be needed for seconds */
+    {
+      /* PATCH(xss-sdl): &tv.tv_sec is not a time_t* everywhere -- on
+       * MinGW timeval.tv_sec is a 32-bit long while time_t is 64-bit.
+       * Copy through a time_t, the way t3d.c already does ("avoid type
+       * cast lossage"). */
+      time_t tv_sec = tv.tv_sec;
+      now = localtime (&tv_sec); /* This seems to be needed for seconds */
+    }
     tmS = now->tm_sec;
     tmM = now->tm_min;
     tmH = now->tm_hour;
