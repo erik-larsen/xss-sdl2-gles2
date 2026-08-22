@@ -22,11 +22,12 @@ glutStrokeWidth(GLUTstrokeFont font, int c)
   StrokeFontPtr fontinfo;
   const StrokeCharRec *ch;
 
-#if defined(_WIN32)
-  fontinfo = (StrokeFontPtr) __glutFont(font);
-#else
+  /* PATCH(xss-sdl): the _WIN32 arm here mapped the font id through
+   * GLUT's internal __glutFont(), which lives in glutint.h -- the
+   * header this tree does not build (see the #if 0 at the top of
+   * glut_swidth.c). In xscreensaver a GLUTstrokeFont already IS the
+   * StrokeFontPtr, on every platform. */
   fontinfo = (StrokeFontPtr) font;
-#endif
 
   if (c < 0 || c >= fontinfo->num_chars)
     return 0;
@@ -44,11 +45,12 @@ glutStrokeLength(GLUTstrokeFont font, const unsigned char *string)
   StrokeFontPtr fontinfo;
   const StrokeCharRec *ch;
 
-#if defined(_WIN32)
-  fontinfo = (StrokeFontPtr) __glutFont(font);
-#else
+  /* PATCH(xss-sdl): the _WIN32 arm here mapped the font id through
+   * GLUT's internal __glutFont(), which lives in glutint.h -- the
+   * header this tree does not build (see the #if 0 at the top of
+   * glut_swidth.c). In xscreensaver a GLUTstrokeFont already IS the
+   * StrokeFontPtr, on every platform. */
   fontinfo = (StrokeFontPtr) font;
-#endif
 
   length = 0;
   for (; *string != '\0'; string++) {
