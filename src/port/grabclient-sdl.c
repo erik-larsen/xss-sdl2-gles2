@@ -81,27 +81,39 @@ scale_to_cover (const unsigned char *src, int sw, int sh,
 
 #ifdef __EMSCRIPTEN__
 
-/* The shell prefetched one random image before main() ran (preRun +
- * addRunDependency), leaving bytes on Module.xssImageBytes and the
- * filename on Module.xssImageName. */
+/* The shell (src/web/shell.html) fetches the bundled image set before
+ * main() runs (preRun + addRunDependency) and parks it on
+ * Module.xssImages as [{name, bytes}]. Startup only waits for the first
+ * one, so the array keeps growing while the hack runs -- we pick from
+ * whatever has landed by the time this grab happens, which is what
+ * makes repeat-grabbing hacks (carousel) show more than one picture. */
 
-EM_JS (int, xss_web_image_len, (void), {
-  return (Module.xssImageBytes && Module.xssImageBytes.length) || 0;
+EM_JS (int, xss_web_image_count, (void), {
+  return (Module.xssImages && Module.xssImages.length) || 0;
 });
-EM_JS (void, xss_web_image_copy, (unsigned char *ptr), {
-  if (Module.xssImageBytes) HEAPU8.set(Module.xssImageBytes, ptr);
+EM_JS (int, xss_web_image_len, (int i), {
+  return Module.xssImages[i].bytes.length;
+});
+EM_JS (void, xss_web_image_copy, (int i, unsigned char *ptr), {
+  HEAPU8.set(Module.xssImages[i].bytes, ptr);
 });
 
 static unsigned char *
 grab_image_bytes (size_t *len_ret, char **name_ret)
 {
-  int len = xss_web_image_len ();
+  int n = xss_web_image_count ();
+  if (n <= 0) return NULL;
+  int i = (int) (random () % n);
+
+  int len = xss_web_image_len (i);
   if (len <= 0) return NULL;
   unsigned char *buf = malloc (len);
   if (!buf) return NULL;
-  xss_web_image_copy (buf);
-  const char *name = emscripten_run_script_string (
-      "(Module.xssImageName || '')");
+  xss_web_image_copy (i, buf);
+
+  char js[128];
+  snprintf (js, sizeof js, "(Module.xssImages[%d].name || '')", i);
+  const char *name = emscripten_run_script_string (js);
   *name_ret = strdup (name && *name ? name : "image");
   *len_ret = (size_t) len;
   return buf;

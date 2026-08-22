@@ -198,7 +198,13 @@ sh_free (void *state)
     R.xsft->free_cb (R.dpy, &R.win, R.closure);
   if (R.dpy)
     jwxyz_image_free_display (R.dpy);
-  xss_res_clear ();
+  R.dpy = NULL;
+  R.closure = NULL;
+  /* The resource database stays: free/init is not only the exit path
+   * any more -- the driver restarts 2D hacks when the drawable is
+   * resized, and the restarted hack must still see its defaults and
+   * command-line options. The table is a handful of strings that the
+   * process exit reclaims. */
 }
 
 /* ---- entry ---------------------------------------------------------- */

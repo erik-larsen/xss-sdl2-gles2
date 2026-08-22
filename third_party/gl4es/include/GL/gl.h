@@ -60,8 +60,14 @@
 #if !defined(OPENSTEP) && (defined(__WIN32__) && !defined(__CYGWIN__))
 #  if (defined(_MSC_VER) || defined(__MINGW32__)) && defined(BUILD_GL32) /* tag specify we're building mesa as a DLL */
 #    define GLAPI __declspec(dllexport)
-#  elif (defined(_MSC_VER) || defined(__MINGW32__)) && defined(_DLL) /* tag specifying we're building for DLL runtime support */
-#    define GLAPI __declspec(dllimport)
+/* PATCH(xss-sdl): the mesa original picks __declspec(dllimport) here
+ * when _DLL is defined. That test is about the C runtime, not about
+ * gl4es: MSYS2/CLANG64 defines _DLL for the shared CRT, and gl4es is
+ * built as a static archive in this tree (STATICLIB=ON). dllimport
+ * would send every gl* call through an __imp_ thunk that no import
+ * library provides -- and it is illegal outright on the GLU function
+ * *definitions* that pick GLAPI up from this header (see the matching
+ * patch in third_party/glues/source/glues*.h). Static linkage it is. */
 #  else /* for use with static link lib build of Win32 edition only */
 #    define GLAPI extern
 #  endif /* _STATIC_MESA support */

@@ -37,6 +37,14 @@
    /* PATCH(xss-sdl): build GLU against gl4es's full GL headers. */
    #include <GL/gl.h>
    #include <GL/glext.h>
+   #if defined(_WIN32)
+      /* PATCH(xss-sdl): under MSYS2/MinGW, gl4es's <GL/gl.h> resolves
+         GLAPI to __declspec(dllimport) (clang defines _DLL for the shared
+         runtime).  This GLU is a static lib and dllimport is illegal on a
+         function definition, so pin GLAPI to plain extern linkage. */
+      #undef GLAPI
+      #define GLAPI extern
+   #endif
    #ifndef GLAPI
       #define GLAPI
    #endif

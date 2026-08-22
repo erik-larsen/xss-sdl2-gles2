@@ -22,7 +22,7 @@ done
 echo "deployed $n hacks into web/"
 
 # bundled CC0 image set for the grab hacks (shared across all pages;
-# each hack page prefetches one at random -- see src/web/shell.html)
+# each page prefetches the whole set -- see src/web/shell.html)
 mkdir -p web/images
 cp assets/images/*.jpg web/images/ 2>/dev/null || true
 ( cd web/images && ls *.jpg 2>/dev/null | \

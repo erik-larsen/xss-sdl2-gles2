@@ -94,24 +94,47 @@
   // document.title, so the tab name becomes "xscreensaver: <hack>".
   var Module = {
     canvas: (function () { return document.getElementById('canvas'); })(),
-    // Prefetch one random image from the bundled CC0 set for the
-    // image-grabbing hacks (grabclient-sdl.c reads it synchronously at
-    // grab time). Failure is fine: the hack falls back to colour bars.
+    // Prefetch the bundled CC0 image set for the image-grabbing hacks
+    // (grabclient-sdl.c reads the bytes synchronously at grab time, so
+    // they have to be here before it asks). The whole set is fetched,
+    // not one image: hacks that grab repeatedly (carousel, photopile,
+    // jigsaw...) would otherwise show the same picture every time.
+    // Startup waits only for the first image to land -- the rest arrive
+    // in the background and widen the pool as they do. Failure is fine:
+    // the hack falls back to colour bars.
     preRun: [function () {
       addRunDependency('xss-image');
+      var started = true;
+      function go() {
+        if (!started) return;
+        started = false;
+        removeRunDependency('xss-image');
+      }
+      Module.xssImages = [];
       fetch('../images/index.json')
         .then(function (r) { if (!r.ok) throw 0; return r.json(); })
         .then(function (list) {
-          var pick = list[Math.floor(Math.random() * list.length)];
-          return fetch('../images/' + pick).then(function (r) {
-            if (!r.ok) throw 0; return r.arrayBuffer();
-          }).then(function (buf) {
-            Module.xssImageBytes = new Uint8Array(buf);
-            Module.xssImageName = pick;
+          // Shuffle: the first image to arrive is the one single-grab
+          // hacks get, and it should not always be the same file.
+          for (var i = list.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = list[i]; list[i] = list[j]; list[j] = t;
+          }
+          var pending = list.length;
+          if (!pending) { go(); return; }
+          list.forEach(function (name) {
+            fetch('../images/' + name)
+              .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+              .then(function (buf) {
+                Module.xssImages.push({ name: name,
+                                        bytes: new Uint8Array(buf) });
+                go();
+              })
+              .catch(function () {})
+              .finally(function () { if (--pending === 0) go(); });
           });
         })
-        .catch(function () {})
-        .finally(function () { removeRunDependency('xss-image'); });
+        .catch(go);
     }],
     print: function (t) { console.log(t); },
     printErr: function (t) { console.warn(t); },

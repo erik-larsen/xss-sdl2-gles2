@@ -45,6 +45,16 @@ url_decode (char *s)
     *d = 0;
 }
 
+/* The canvas' laid-out CSS size. emscripten_get_element_css_size()
+ * reports 0x0 here (it reads the element's inline style, which the page
+ * leaves to the stylesheet), so measure the box directly. */
+EM_JS (double, xss_canvas_css_size, (int want_width), {
+    var c = Module.canvas || document.getElementById('canvas');
+    if (!c) return 0;
+    var r = c.getBoundingClientRect();
+    return want_width ? r.width : r.height;
+});
+
 /* Build an argv from the page's query string: ?frames=60&shot=o.ppm
  * becomes { prog, "--frames", "60", "--shot", "o.ppm" }. Unknown keys
  * pass through as --key value and hit the driver's normal parser
@@ -173,6 +183,12 @@ static GLuint compile_shader(GLenum type, const char *src)
 
 static void init_blit(void)
 {
+    /* The blit pipeline exists only for the 2D (jwxyz-image) hacks. GL
+     * hacks drive gl4es, which caches GL state; every object we create
+     * behind its back is one more chance to desync it (see the VBO note
+     * below and the texture note in alloc_surface). */
+    if (g.hack->gl_p) return;
+
     GLuint vs = compile_shader(GL_VERTEX_SHADER,   vsrc);
     GLuint fs = compile_shader(GL_FRAGMENT_SHADER, fsrc);
     g.prog = glCreateProgram();
@@ -228,6 +244,16 @@ static void alloc_surface(int w, int h)
     g.surf.pitch  = w;
     g.surf.pixels = calloc((size_t)w * h, 4);
     if (!g.surf.pixels) { fprintf(stderr, "ERROR: out of memory\n"); exit(1); }
+
+    /* GL hacks never blit this surface, and touching the blit texture
+     * here would desync gl4es: our raw GLES2 glBindTexture is invisible
+     * to its texture-binding cache, so the hack's next bind of the
+     * texture gl4es believes is already current is skipped -- and every
+     * textured draw then samples this empty RGBA surface instead.
+     * (antspotlight's board went black the moment a browser resize
+     * reallocated the surface mid-run.) Same desync class as the VBO
+     * binding in init_blit. */
+    if (g.hack->gl_p) return;
 
     glBindTexture(GL_TEXTURE_2D, g.tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0,
@@ -315,10 +341,36 @@ static void write_ppm(const char *path)
 
 static void handle_resize(void)
 {
-    SDL_GL_GetDrawableSize(g.window, &g.win_w, &g.win_h);
+    int w = 0, h = 0;
+    SDL_GL_GetDrawableSize(g.window, &w, &h);
+    if (w < 1 || h < 1) return;
+    if (w == g.win_w && h == g.win_h) return;   /* SDL re-announces the
+                                                 * size it already has;
+                                                 * reallocating would
+                                                 * blank the drawable
+                                                 * for no reason. */
+    g.win_w = w;
+    g.win_h = h;
     alloc_surface(g.win_w, g.win_h);
-    if (g.hack->reshape)
-        g.hack->reshape(&g.surf, g.hack_state);
+
+    /* 2D hacks get restarted rather than reshaped. Their drawable IS
+     * the window, and alloc_surface just handed them a fresh (blank)
+     * one -- upstream's reshape_cb, where it does anything at all,
+     * assumes the old pixels are still there. Worse, most of the
+     * image-grab hacks grab once at init: on the web the browser's
+     * first resize event lands right after init, so decayscreen would
+     * paint the photo, lose it to the realloc, and shuffle black
+     * rectangles forever. A restart re-runs init at the true size.
+     * GL hacks keep the reshape path: they render from scratch every
+     * frame and their reshape_cb rebuilds the projection. */
+    if (g.hack->gl_p) {
+        if (g.hack->reshape)
+            g.hack->reshape(&g.surf, g.hack_state);
+    } else if (g.hack_state) {
+        if (g.hack->free)
+            g.hack->free(g.hack_state);
+        g.hack_state = g.hack->init(&g.surf);
+    }
 }
 
 static void poll_events(void)
@@ -420,12 +472,13 @@ static void usage(const char *prog)
 int xss_driver_run(const xss_hack *hack, int argc, char **argv)
 {
     int req_w = 800, req_h = 600;
+    bool size_given = false;
     memset(&g, 0, sizeof g);
     g.hack = hack;
 
     for (int i = 1; i < argc; i++) {
-        if      (!strcmp(argv[i], "--width")  && i+1 < argc) req_w = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--height") && i+1 < argc) req_h = atoi(argv[++i]);
+        if      (!strcmp(argv[i], "--width")  && i+1 < argc) { req_w = atoi(argv[++i]); size_given = true; }
+        else if (!strcmp(argv[i], "--height") && i+1 < argc) { req_h = atoi(argv[++i]); size_given = true; }
         else if (!strcmp(argv[i], "--frames") && i+1 < argc) g.frames_limit = atol(argv[++i]);
         else if (!strcmp(argv[i], "--shot")   && i+1 < argc) g.shot_path = argv[++i];
         else if (!strcmp(argv[i], "--fps"))                  g.show_fps = true;
@@ -441,6 +494,8 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
         else { usage(argv[0]); return 2; }
 #endif
     }
+
+    (void) size_given;      /* consulted on the web path only */
 
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
@@ -486,6 +541,21 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
 #endif
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
+#ifdef __EMSCRIPTEN__
+    /* Create the canvas at the size the page actually gives it. SDL
+     * would otherwise open at the 800x600 default and only grow when
+     * the browser's first resize event lands -- i.e. after the hack has
+     * initialized. Hacks that size themselves once at init then draw
+     * into a corner of the real canvas forever, and the image-grab ones
+     * (decayscreen) lose the picture entirely: they paint it into the
+     * window, and the resize reallocates that backing store from under
+     * them before they can save a copy. */
+    if (!size_given) {
+        double cw = xss_canvas_css_size (1), ch = xss_canvas_css_size (0);
+        if (cw >= 1 && ch >= 1) { req_w = (int) cw; req_h = (int) ch; }
+    }
+#endif
+
     char title[256];
     snprintf(title, sizeof title, "xscreensaver: %s", hack->name);
     g.window = SDL_CreateWindow(title,
@@ -521,8 +591,7 @@ int xss_driver_run(const xss_hack *hack, int argc, char **argv)
      * while reshape()-driven hacks recover on the first resize event.
      * Size the window from the page viewport before the hack sees it. */
     if (g.win_w <= 0 || g.win_h <= 0) {
-        double cw = 0, ch = 0;
-        emscripten_get_element_css_size("#canvas", &cw, &ch);
+        double cw = xss_canvas_css_size (1), ch = xss_canvas_css_size (0);
         if (cw < 1 || ch < 1) { cw = req_w; ch = req_h; }
         /* Size the surface only -- SDL's own resize event arrives right
          * after layout at this same CSS size and syncs the canvas
