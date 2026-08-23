@@ -67,7 +67,19 @@
 #endif // AliasDecl
 
 #ifndef AliasExport
- #if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+/* PATCH(xss-sdl): _WIN32 joins Apple and emscripten here, i.e. gl4es
+ * declares the plain gl* names but does not define them as aliases of
+ * its own gl4es_gl* entry points.
+ *
+ * Nothing in this tree wants those aliases: hack code reaches gl4es
+ * through the gl4es_gl* macros in its headers, and the SDL driver's own
+ * GLES2 calls (the 2D blit path) go to the real GLES driver -- which on
+ * Windows and macOS is ANGLE. Emitting them makes the two providers
+ * collide, and where ELF quietly prefers the static archive, lld will
+ * not: "duplicate symbol: glGetError", and then "glActiveTexture was
+ * replaced" once --allow-multiple-definition tries to paper over it.
+ * macOS has run this way since M4; Windows now matches it. */
+ #if !defined(__EMSCRIPTEN__) && !defined(__APPLE__) && !defined(_WIN32)
   #ifdef __GNUC__
    #define _AliasExport_(RET,ENM,DEF,INM,SUF) EXPORT \
       RET APIENTRY_GL4ES ENM DEF __attribute__((alias(_MNG(gl4es_##INM,SUF))))
