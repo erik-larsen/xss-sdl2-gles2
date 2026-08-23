@@ -27,7 +27,14 @@
 #ifndef __gl_h_
 #define __gl_h_
 
-#if defined(__EMSCRIPTEN__) || defined(__APPLE__)
+/* PATCH(xss-sdl): _WIN32 joins the two platforms that call gl4es by its
+ * internal names. This is the other half of the alias change in
+ * src/gl/attributes.h: gl4es either exports the plain gl* names as
+ * aliases (Linux) or has its callers compile to gl4es_gl* (Apple,
+ * emscripten, and now Windows) -- the two mechanisms belong together.
+ * Windows needs the second one, because the plain names there are
+ * ANGLE's, and lld will not let both providers define them. */
+#if defined(__EMSCRIPTEN__) || defined(__APPLE__) || defined(_WIN32)
 #define USE_MGL_NAMESPACE    1
 #define GL_GLEXT_PROTOTYPES  1
 #define MANGLE(x)            gl4es_gl##x
