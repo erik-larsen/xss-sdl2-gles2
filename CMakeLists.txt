@@ -114,6 +114,21 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(xss_driver PUBLIC ${XSS_GLES})
 endif()
 
+# On Windows the GL-hack binaries link both gl4es (a static archive that
+# exports glGetError & co. as gl4es's own entry points) and ANGLE's
+# libGLESv2 import library, which exports the same names -- and lld
+# treats an import library as a definition, so it errors where ELF and
+# Mach-O just let the first definition win. Restore that behaviour: the
+# static gl4es archive precedes the import lib on the link line, and
+# gl4es reaches the real ANGLE entry points through its own runtime
+# loader (proc_address()), never by name. Which library actually owns
+# the GL symbols in a Windows binary is an M4b question -- see
+# MILESTONES.md -- and this keeps the link topology of the other three
+# platforms untouched until then.
+if(WIN32 AND NOT EMSCRIPTEN)
+  add_link_options(-Wl,--allow-multiple-definition)
+endif()
+
 # --------------------------------------------------------------- hacks
 # xss_add_hack(<name> <sources...>) -> executable (native) / .html (web)
 function(xss_add_hack name)
@@ -210,6 +225,12 @@ if(NOT EMSCRIPTEN)
   target_link_libraries(xss_port PUBLIC PNG::PNG)
 endif()
 target_link_libraries(xss_port PUBLIC xss_driver)
+if(WIN32 AND NOT EMSCRIPTEN)
+  # jwxyz-timers' XtAppProcessEvent waits on the XtAppAddInput fds with
+  # select()/FD_ISSET; on Windows those live in winsock (select is a
+  # dllimport, FD_ISSET calls __WSAFDIsSet).
+  target_link_libraries(xss_port PUBLIC ws2_32)
+endif()
 if(NOT EMSCRIPTEN)
   find_package(Threads REQUIRED)
   target_link_libraries(xss_port PUBLIC Threads::Threads)

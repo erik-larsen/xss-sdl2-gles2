@@ -47,6 +47,14 @@ xss_setenv (const char *key, const char *val, int overwrite)
   return _putenv_s (key, val);
 }
 #define setenv xss_setenv
+
+/* ...nor ffs(). The clang builtin is exactly it (lockward.c). */
+static inline int
+xss_ffs (int i)
+{
+  return __builtin_ffs (i);
+}
+#define ffs xss_ffs
 #endif
 
 #endif

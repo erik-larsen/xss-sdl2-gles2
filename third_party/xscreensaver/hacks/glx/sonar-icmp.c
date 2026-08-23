@@ -15,7 +15,13 @@
 #include "sonar.h"
 #include "doubletime.h"
 #include "version.h"
-#include "async_netdb.h"
+#ifndef _WIN32
+/* PATCH(xss-sdl): async_netdb.h opens with <netdb.h>, which MinGW
+ * does not have. Only the HAVE_PING body uses it, and this port
+ * never defines HAVE_PING -- the file compiles to the "not
+ * compiled with support for pinging hosts" stub. */
+# include "async_netdb.h"
+#endif
 
 #undef usleep /* conflicts with unistd.h on OSX */
 
