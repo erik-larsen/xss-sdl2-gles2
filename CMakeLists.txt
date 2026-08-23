@@ -463,6 +463,29 @@ xss_add_xhack(vfeedback ${XSS}/hacks/analogtv.c)
 xss_add_xhack(xanalogtv ${XSS}/hacks/analogtv.c)
 xss_add_xhack(phosphor ${XSS}/hacks/analogtv.c ${XSS}/hacks/ansi-tty.c)
 
+# m6502 embeds the bundled 6502 programs the same way molecule embeds
+# its PDB files (upstream: hacks/m6502.sh, comments stripped first).
+set(M6502_H ${CMAKE_BINARY_DIR}/gen/m6502.h)
+file(GLOB M6502_ASM ${XSS}/hacks/images/m6502/*.asm)
+add_custom_command(
+  OUTPUT ${M6502_H}
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/gen_ad2c.py
+          --strip-asm-comments ${M6502_H} ${M6502_ASM}
+  DEPENDS ${M6502_ASM} ${CMAKE_SOURCE_DIR}/scripts/gen_ad2c.py
+  COMMENT "Generating m6502.h from ${XSS}/hacks/images/m6502")
+xss_add_xhack(m6502 ${XSS}/hacks/analogtv.c ${XSS}/hacks/asm6502.c)
+target_sources(m6502 PRIVATE ${M6502_H})
+target_include_directories(m6502 PRIVATE ${CMAKE_BINARY_DIR}/gen)
+
+xss_add_xhack(noseguy)
+
+# apple2's module table lives in apple2-main.c; apple2.c is the ][
+# emulation it drives (xss_add_xhack compiles hacks/<name>.c, so the
+# main file rides along as an extra source and HACK_PREFIX still
+# matches XSCREENSAVER_MODULE ("Apple2", apple2)).
+xss_add_xhack(apple2 ${XSS}/hacks/apple2-main.c ${XSS}/hacks/analogtv.c
+              ${XSS}/hacks/asm6502.c ${XSS}/hacks/ansi-tty.c)
+
 # GLE (third_party/gle) -- the tubing/extrusion library the extrusion
 # hack calls. Upstream links a system libgle; here it is a static lib
 # built against gl4es + glues like everything else. HAVE_GLE3 picks
@@ -495,15 +518,15 @@ target_link_libraries(extrusion PRIVATE gle)
 target_compile_definitions(extrusion PRIVATE HAVE_GLE3=1)
 
 # molecule embeds the bundled PDB data (upstream builds it with
-# hacks/glx/molecules.sh + utils/ad2c; scripts/gen_molecules.py is the
+# hacks/glx/molecules.sh + utils/ad2c; scripts/gen_ad2c.py is the
 # same transform, and keeps the .pdb files readable in the tree).
 set(MOLECULES_H ${CMAKE_BINARY_DIR}/gen/molecules.h)
 file(GLOB MOLECULE_PDB ${XSS}/hacks/images/molecules/*.pdb)
 add_custom_command(
   OUTPUT ${MOLECULES_H}
-  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/gen_molecules.py
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/gen_ad2c.py
           ${MOLECULES_H} ${MOLECULE_PDB}
-  DEPENDS ${MOLECULE_PDB} ${CMAKE_SOURCE_DIR}/scripts/gen_molecules.py
+  DEPENDS ${MOLECULE_PDB} ${CMAKE_SOURCE_DIR}/scripts/gen_ad2c.py
   COMMENT "Generating molecules.h from ${XSS}/hacks/images/molecules")
 xss_add_glhack(molecule fps-gl glsl-utils gltrackball quaternion rotator
                sphere texfont trackball tube)

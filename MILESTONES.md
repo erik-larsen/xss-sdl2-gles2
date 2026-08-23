@@ -776,10 +776,39 @@ be a driver option).
     network dependency, neither of which this port has (and fork() does
     not exist on the web at all). Same call as webcollage in M6.
 
-- Still unwired: 17 2D hacks (apple2, bsod, bubbles, cwaves, filmleader,
-  flag, glitchpeg, m6502, maze, noseguy, pacman, phosphor, pong,
-  testx11, vfeedback, xanalogtv, xflame) -- the analogtv family among
-  them still blocked on depth-1 XYPixmap XGetImage (see M6c).
+- **M11d ✅ the 2D remainder: 16 of 17.** bsod, bubbles, cwaves,
+  filmleader, flag, maze, pacman, phosphor, pong, testx11, vfeedback,
+  xanalogtv, xflame, plus apple2, m6502 and noseguy once their data was
+  vendored (44 bubbles + 8 noseguy image headers via scripts/png2c.py;
+  m6502's 33 .asm programs through the same ad2c transform as
+  molecules.h, so scripts/gen_molecules.py became scripts/gen_ad2c.py).
+  Only glitchpeg is left: it popen()s xscreensaver-getimage-file to name
+  an image file, which this port does not have.
+
+  phosphor was the interesting one -- the M6c blocker, and it turned out
+  to be three separate holes in the image backend plus a wrong fix:
+  - XSetClipMask logged "TODO: No clip masks yet" and did nothing.
+    fill_rects honours it now (depth-1 drawables are stored 32bpp, so
+    the test is "is this word non-zero", positioned by clip_x/y_origin).
+  - XCopyPlane forwarded to XCopyArea -- which jwxyz-common admits is
+    wrong: "supposed to map 1/0 to fg/bg, not to white/black". copy_area
+    does that mapping now when the source is depth 1, so glyphs take the
+    colour of the fade GC that drew them.
+  - Text drawn into a depth-1 drawable was alpha-blended, and a bitmap's
+    foreground is the single bit 1, so every glyph blended down to
+    "not set". Threshold the coverage instead.
+  - And XGetImage used to strip alpha from read-back pixels. Within
+    jwxyz those bits ARE the pixel value (BlackPixel is alpha_mask), so
+    stripping them broke `XGetPixel(im,x,y) == BlackPixelOfScreen`,
+    which is exactly how phosphor captures its font: every glyph scanned
+    as blank and the terminal showed nothing but its cursor. The earlier
+    note in that patch blamed the symptom on phosphor/apple2 themselves.
+    Alpha stays; flag and bubbles came right with it, and
+    jigsaw/glslideshow/photopile/bsod were re-checked both ways.
+
+  With those in place apple2 boots and lists BASIC, m6502 runs its
+  assembly demos, and phosphor scrolls green text -- the analogtv family
+  is no longer blocked.
 
 ## M3a (emscripten) -- delivered
 
