@@ -8,10 +8,6 @@ Windows and for the **web** via Emscripten/WebAssembly. One executable
 (or one web page) per hack, compiled from the **unmodified** upstream
 hack source.
 
-**▶ Live gallery: https://erik-larsen.github.io/xss-sdl2-gles2/** — all
-hacks running in the browser (click a thumbnail; press `Esc`/`Q` to
-exit).
-
 ## Status
 
 **233 / 233 shipping hacks pass** — every wired hack renders correctly,
