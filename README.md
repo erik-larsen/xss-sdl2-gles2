@@ -1,4 +1,4 @@
-# xss-sdl2-gles2 — [xscreensaver → SDL2 + OpenGL ES2](https://erik-larsen.github.io/xss-sdl2-gles2/)
+# xss-sdl2-gles2 — [xscreensaver for Web, Linux, Mac, Windows](https://erik-larsen.github.io/xss-sdl2-gles2/)
 
 [![CI](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml)
 [![Gallery](https://img.shields.io/badge/gallery-233%20hacks-6cf)](https://erik-larsen.github.io/xss-sdl2-gles2/)
