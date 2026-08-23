@@ -20,7 +20,7 @@ style) with auto-screenshot thumbs from the harness.
   (third_party/xscreensaver/hacks/config/<hack>.xml).
 """
 
-import argparse, csv, json, os, re, sys
+import argparse, csv, glob, json, os, re, sys
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,26 +29,24 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def registered_hacks():
     """-> {name: '2D'|'GL'} from the CMake registrations."""
     hacks = {}
-    for path, pat, klass in [
-        ("CMakeLists.txt", r"xss_add_xhack\((\w+)", "2D"),
-        ("CMakeLists.txt", r"xss_add_glhack(?:_p)?\((\w+)", "GL"),
-        ("cmake/batch2-glhacks.cmake", r"xss_add_glhack(?:_p)?\((\w+)", "GL"),
-    ]:
-        f = os.path.join(ROOT, path)
-        if not os.path.exists(f):
-            continue
-        for m in re.finditer(pat, open(f).read()):
-            hacks[m.group(1)] = klass
-    # foreach-list registrations in CMakeLists (batch 1 + textclient)
+    # Every CMake file that can register a hack: the top-level one plus
+    # each generated batch under cmake/ (globbed, so a new batch file
+    # shows up in the gallery without editing this script).
+    sources = [os.path.join(ROOT, "CMakeLists.txt")]
+    sources += sorted(glob.glob(os.path.join(ROOT, "cmake", "*.cmake")))
+    for f in sources:
+        text = open(f).read()
+        for m in re.finditer(r"xss_add_xhack\((\w+)", text):
+            hacks[m.group(1)] = "2D"
+        for m in re.finditer(r"xss_add_glhack(?:_p)?\((\w+)", text):
+            hacks[m.group(1)] = "GL"
+    # foreach-list registrations: set(XSS_2D_<anything> a b c)
     text = open(os.path.join(ROOT, "CMakeLists.txt")).read()
-    for listname in ("XSS_2D_BATCH1", "XSS_2D_BATCH1_XLOCK",
-                     "XSS_2D_TEXTCLIENT", "XSS_2D_GRAB"):
-        m = re.search(r"set\(" + listname + r"\s+(.*?)\)", text, re.S)
-        if m:
-            # strip inline comments (e.g. "# noseguy needs assets")
-            body = re.sub(r"#[^\n]*", "", m.group(1))
-            for n in body.split():
-                hacks[n] = "2D"
+    for m in re.finditer(r"set\((XSS_2D_\w+)\s+(.*?)\)", text, re.S):
+        # strip inline comments (e.g. "# noseguy needs assets")
+        body = re.sub(r"#[^\n]*", "", m.group(2))
+        for n in body.split():
+            hacks[n] = "2D"
     hacks["polyhedra"] = "GL"          # manual registration
     hacks.pop("name", None)            # function definitions, not hacks
     return hacks

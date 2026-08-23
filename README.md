@@ -1,8 +1,8 @@
 # xss-sdl2-gles2 — [xscreensaver for Web, Linux, Mac, Windows](https://erik-larsen.github.io/xss-sdl2-gles2/)
 
 [![CI](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml)
-[![Gallery](https://img.shields.io/badge/gallery-233%20hacks-6cf)](https://erik-larsen.github.io/xss-sdl2-gles2/)
-[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20web%20%7C%20windows--wip-lightgrey)](#build--run)
+[![Gallery](https://img.shields.io/badge/gallery-278%20hacks-6cf)](https://erik-larsen.github.io/xss-sdl2-gles2/)
+[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20windows%20%7C%20web-lightgrey)](#build--run)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 ![screenshot](media/screenshot.png)
@@ -15,10 +15,14 @@ hack source.
 
 ## Status
 
-**233 / 233 shipping hacks pass** — every wired hack renders correctly,
-verified headlessly (clean exit, non-blank, frame-to-frame motion) and
-by eye, natively on macOS/ANGLE and as WebAssembly. `tests/STATUS.md`
-tracks per-hack state; `MILESTONES.md` has the full development log.
+**278 hacks wired**, which is every shipping xscreensaver hack whose
+source this port can build. 233 of them are verified end to end —
+headless harness (clean exit, non-blank, frame-to-frame motion) plus a
+full web sweep, and by eye, natively on macOS/ANGLE and as WebAssembly.
+The 45 added in M11 build native and web and render correctly in native
+spot checks; their first harness run is what will fold them into
+`tests/STATUS.md` and the gallery. `MILESTONES.md` has the full
+development log.
 
 | Area | State |
 |---|---|
@@ -28,13 +32,18 @@ tracks per-hack state; `MILESTONES.md` has the full development log.
 | Thumbnail gallery + GitHub Pages deploy | done |
 | Real fonts (stb_truetype + Liberation subset) | done |
 | textclient hacks (bundled text, no subprocess) | done |
-| image-grab hacks (SMPTE colour-bars source) | done |
-| Native CI: Linux ✓ · macOS ✓ · Windows | Windows WIP |
+| image-grab hacks (bundled CC0 photo set) | done |
+| CI: Linux · macOS · Windows · web · Pages | all green |
 
-**Deferred** (a handful of ~250 upstream hacks): the analogtv family
-(apple2, xanalogtv, bsod) and phosphor's terminal glyph pipeline;
-`molecule` (needs upstream PDB data), `xshadertoy` (shader asset
-bundling), `noseguy` (image assets), `extrusion`. See `MILESTONES.md`.
+**Not shipping**, and why: `mapscroller` and `webcollage` fetch from
+the network through a helper process — no subprocess, no network, and
+no `fork()` on the web, so both are excluded by design. `glitchpeg` is
+wired but renders blank: it asks `xscreensaver-getimage-file` to name an
+image file, which this port does not have. Everything else upstream
+ships with a config and a buildable source is in. See `MILESTONES.md`.
+
+Windows builds and packages in CI; driving ANGLE there at runtime is
+still M4b.
 
 ## Architecture
 
