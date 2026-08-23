@@ -166,6 +166,40 @@ copy_area (Display *dpy, Drawable src, Drawable dst, GC gc,
            int src_x, int src_y, unsigned int width, unsigned int height,
            int dst_x, int dst_y)
 {
+  /* PATCH(xss-sdl): a depth-1 source is a plane copy -- jwxyz-common's
+     XCopyPlane forwards to XCopyArea and says so itself: "This isn't
+     right: XCopyPlane() is supposed to map 1/0 to fg/bg, not to
+     white/black". Depth-1 drawables are stored 32bpp here, so the
+     mapping is a recolouring blit. Without it every phosphor glyph
+     comes out white instead of taking the colour of the fade GC it was
+     drawn with. */
+  if (gc && jwxyz_drawable_depth (src) == 1 && jwxyz_drawable_depth (dst) != 1) {
+    const XRectangle *sframe = jwxyz_frame (src);
+    const XRectangle *dframe = jwxyz_frame (dst);
+    const char *sdata = jwxyz_image_data (src);
+    char *ddata = jwxyz_image_data (dst);
+    ptrdiff_t spitch = jwxyz_image_pitch (src), dpitch = jwxyz_image_pitch (dst);
+    uint32_t fg = (uint32_t) gc->gcv.foreground;
+    uint32_t bg = (uint32_t) gc->gcv.background;
+
+    for (unsigned row = 0; row != height; ++row) {
+      int sy = src_y + (int) row, dy = dst_y + (int) row;
+      if (sy < 0 || sy >= (int) sframe->height ||
+          dy < 0 || dy >= (int) dframe->height)
+        continue;
+      const uint32_t *srow = (const uint32_t *) (sdata + sy * spitch);
+      uint32_t *drow = (uint32_t *) (ddata + dy * dpitch);
+      for (unsigned col = 0; col != width; ++col) {
+        int sx = src_x + (int) col, dx = dst_x + (int) col;
+        if (sx < 0 || sx >= (int) sframe->width ||
+            dx < 0 || dx >= (int) dframe->width)
+          continue;
+        drow[dx] = srow[sx] ? fg : bg;
+      }
+    }
+    return;
+  }
+
   jwxyz_blit (jwxyz_image_data (src), jwxyz_image_pitch (src), src_x, src_y, 
               jwxyz_image_data (dst), jwxyz_image_pitch (dst), dst_x, dst_y, 
               width, height);
@@ -324,6 +358,41 @@ fill_rects (Display *dpy, Drawable d, GC gc,
       continue;
     unsigned x_size = x1 - x0, y_size = y1 - y0;
     void *dst = SEEK_XY (image_data, image_pitch, x0, y0);
+
+    /* PATCH(xss-sdl): clip mask. A depth-1 drawable is stored 32bpp
+       here, so the mask test is just "is this word non-zero", and the
+       mask sits at (clip_x_origin, clip_y_origin) in the destination --
+       anything outside it is clipped away. phosphor paints each glyph's
+       fuzzy border by filling a rectangle through the glyph bitmap;
+       without this it filled solid blocks (and SetClipMask used to be a
+       no-op that just logged "TODO"). */
+    Pixmap mask = gc ? gc->gcv.clip_mask : NULL;
+    if (mask) {
+      const XRectangle *mframe = jwxyz_frame (mask);
+      const void *mdata = jwxyz_image_data (mask);
+      ptrdiff_t mpitch = jwxyz_image_pitch (mask);
+      int mx0 = gc->gcv.clip_x_origin, my0 = gc->gcv.clip_y_origin;
+      for (unsigned yy = 0; yy != y_size; ++yy) {
+        int my = (int) (y0 + yy) - my0;
+        if (my < 0 || my >= (int) mframe->height)
+          continue;
+        const uint32_t *mrow =
+          (const uint32_t *) ((const char *) mdata + my * mpitch);
+        uint32_t *drow = (uint32_t *) ((char *) dst + (ptrdiff_t) yy * image_pitch);
+        for (unsigned xx = 0; xx != x_size; ++xx) {
+          int mx = (int) (x0 + xx) - mx0;
+          if (mx < 0 || mx >= (int) mframe->width || !mrow[mx])
+            continue;
+          switch (func) {
+          case GXxor: drow[xx] ^= (uint32_t) pixel; break;
+          case GXor:  drow[xx] |= (uint32_t) pixel; break;
+          default:    drow[xx]  = (uint32_t) pixel; break;
+          }
+        }
+      }
+      continue;
+    }
+
     while (y_size) {
       switch (func) {                           /* PATCH(xss-sdl) */
       case GXxor:
@@ -484,6 +553,29 @@ PutImage (Display *dpy, Drawable d, GC gc, XImage *ximage,
     const uint8_t *src_row = src_ptr;
     uint8_t *dst_row = dst_ptr;
 
+    /* PATCH(xss-sdl): a depth-1 destination is a bitmap, not a picture.
+       jwxyz_draw_string paints text as a 32-bit image whose alpha is the
+       glyph coverage and whose colour is the GC foreground -- and a
+       bitmap's foreground is the single bit 1, so blending it leaves
+       words of 0 or 1-scaled-by-alpha, i.e. "not set" for anything that
+       reads the plane back. phosphor builds its glyph atlas exactly that
+       way (text -> depth-1 pixmap -> XCopyPlane per character) and every
+       character came out empty. Threshold the coverage instead. */
+    if (jwxyz_drawable_depth (d) == 1) {
+      uint32_t fg = (uint32_t) gcv->foreground;
+      while (h) {
+        const uint8_t *src = src_row;
+        uint32_t *dst = (uint32_t *) dst_row;
+        for (unsigned x = 0; x != w; ++x)
+          if (src[x * 4 + 3] >= 0x80)
+            dst[x] = fg;
+        src_row += src_pitch;
+        dst_row += dst_pitch;
+        --h;
+      }
+      return 0;
+    }
+
     /* Slight loss of precision here: color values may end up being one less
        than what they should be.
      */
@@ -561,26 +653,18 @@ GetSubImage (Display *dpy, Drawable d, int x, int y,
     jwxyz_blit (jwxyz_image_data (d), jwxyz_image_pitch (d), x, y,
                 dest_image->data, dest_image->bytes_per_line, dest_x, dest_y,
                 width, height);
-    /* PATCH(xss-sdl): strip the internal opaque-alpha from a read-back
-       image. Drawables store black as BlackPixel == alpha_mask
-       (0xFF000000) so it composites opaquely, but a returned XImage is
-       visible RGB data: leaving alpha set makes "black" non-zero, which
-       breaks the common white-on-black readback + `pixel ? 1 : 0`
-       threshold (phosphor/apple2 font capture -> every glyph a solid
-       block). Zeroing alpha is harmless for GXcopy re-blits (alpha
-       ignored) and only matters to alpha_allowed re-blits, which don't
-       read pixels back this way. */
-    uint32_t amask = (uint32_t)
-      DefaultVisualOfScreen (DefaultScreenOfDisplay (dpy))->alpha_mask;
-    if (amask) {
-      for (unsigned r = 0; r < height; r++) {
-        uint32_t *row = (uint32_t *)
-          (dest_image->data + (size_t) (dest_y + (int) r)
-           * dest_image->bytes_per_line) + dest_x;
-        for (unsigned c = 0; c < width; c++)
-          row[c] &= ~amask;
-      }
-    }
+    /* PATCH(xss-sdl): a read-back image keeps the alpha bits, because
+       within jwxyz they ARE part of the pixel value: BlackPixel is
+       alpha_mask (0xFF000000), so a hack comparing a read-back pixel
+       against BlackPixelOfScreen only matches if the alpha survives.
+       phosphor's font capture does exactly that -- it walks the glyph
+       sheet asking `XGetPixel(im,x,y) == black` -- and with the bits
+       stripped every glyph was empty and the terminal showed nothing
+       but its cursor. (An earlier pass here zeroed alpha instead, on
+       the theory that a `pixel ? 1 : 0` threshold would otherwise see
+       black as set. That idiom assumes a 24-bit visual where black is
+       0; under jwxyz's convention it is broken either way, and it was
+       not what ailed phosphor.) */
     return dest_image;
   }
 
@@ -621,7 +705,10 @@ GetSubImage (Display *dpy, Drawable d, int x, int y,
 static int
 SetClipMask (Display *dpy, GC gc, Pixmap m)
 {
-  Log ("TODO: No clip masks yet"); // Slip/colorbars.c needs this.
+  /* PATCH(xss-sdl): was a no-op that logged "TODO: No clip masks yet".
+     fill_rects honours it now (see there); everything else still
+     ignores it, which is what upstream's other backends do too. */
+  gc->gcv.clip_mask = m;
   return 0;
 }
 
