@@ -1,5 +1,10 @@
 # xss-sdl2-gles2 — [xscreensaver → SDL2 + OpenGL ES2](https://erik-larsen.github.io/xss-sdl2-gles2/)
 
+[![CI](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/erik-larsen/xss-sdl2-gles2/actions/workflows/ci.yml)
+[![Gallery](https://img.shields.io/badge/gallery-233%20hacks-6cf)](https://erik-larsen.github.io/xss-sdl2-gles2/)
+[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macos%20%7C%20web%20%7C%20windows--wip-lightgrey)](#build--run)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 ![screenshot](media/screenshot.png)
 
 A port of [xscreensaver](https://github.com/Zygo/xscreensaver)'s screen
