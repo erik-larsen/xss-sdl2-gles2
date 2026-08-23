@@ -748,12 +748,38 @@ be a driver option).
   covid19, dangerball, gltext, hilbert, juggler3d, moebius, stairs,
   topblock, bubble3d): all unchanged.
 
-- Still unwired: 4 GL hacks whose sources do not compile yet
-  (extrusion + its 7 helpers, klondike, mapscroller, molecule) and 17
-  2D hacks (apple2, bsod, bubbles, cwaves, filmleader, flag, glitchpeg,
-  m6502, maze, noseguy, pacman, phosphor, pong, testx11, vfeedback,
-  xanalogtv, xflame) -- the analogtv family among them still blocked on
-  depth-1 XYPixmap XGetImage (see M6c).
+- **M11c ✅ the last three GL hacks, and their missing data.** None of
+  them was a code problem: each needed something upstream keeps outside
+  the source tree.
+  - **molecule**: `#include "molecules.h"`, built by upstream from
+    hacks/images/molecules/*.pdb. Vendored the 38 .pdb files (284K of
+    readable text) and reimplemented the generator as
+    scripts/gen_molecules.py (upstream pipes utils/ad2c through sed);
+    CMake generates molecules.h into gen/ at build time.
+  - **klondike**: 54 card images as `images/gen/*_png.h`. The tarball
+    ships the .png sources, not the headers -- upstream's build makes
+    them with utils/ad2c, and so do the 65 already in this tree. Added
+    scripts/png2c.py, which reproduces that format byte-for-byte
+    (verified by regenerating amiga_png.h and diffing against the
+    committed one), and generated the 54. +9MB of C strings, in line
+    with the 35MB already there; klondike.wasm is 4.0MB as a result.
+  - **extrusion**: needs GLE, the tubing/extrusion library upstream
+    links as an external dependency. Vendored (third_party/gle, IBM
+    sample-source license -- see its README) and built as a static lib
+    against gl4es + glues. Two build fixes: OPENGL_10=1, which is what
+    GLE's configure defines to select the glBegin/glVertex generation
+    of its port.h macros, and putting src/port/glshim ahead of
+    gl4es/include so GLE's `<GL/glu.h>` reaches glues rather than
+    gl4es's own header, which mangles the GLU names to mglu*.
+  - **mapscroller: excluded.** It fork()s a Perl helper to pull map
+    tiles from openstreetmap.org over HTTPS -- a subprocess and a
+    network dependency, neither of which this port has (and fork() does
+    not exist on the web at all). Same call as webcollage in M6.
+
+- Still unwired: 17 2D hacks (apple2, bsod, bubbles, cwaves, filmleader,
+  flag, glitchpeg, m6502, maze, noseguy, pacman, phosphor, pong,
+  testx11, vfeedback, xanalogtv, xflame) -- the analogtv family among
+  them still blocked on depth-1 XYPixmap XGetImage (see M6c).
 
 ## M3a (emscripten) -- delivered
 

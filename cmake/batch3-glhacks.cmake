@@ -25,3 +25,4 @@ xss_add_glhack(timetunnel fps-gl glsl-utils gltrackball quaternion rotator texfo
 xss_add_glhack(unknownpleasures fps-gl glsl-utils gltrackball quaternion texfont trackball)
 xss_add_glhack(vigilance fps-gl gllist glsl-utils gltrackball quaternion seccam texfont trackball)
 xss_add_glhack(worldpieces countries earth fps-gl glsl-utils gltrackball quaternion rotator sphere texfont timezones trackball triangle)
+xss_add_glhack(klondike fps-gl glsl-utils gltrackball klondike-game quaternion texfont trackball)
