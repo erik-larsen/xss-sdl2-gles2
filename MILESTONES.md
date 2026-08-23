@@ -701,6 +701,60 @@ be a driver option).
   emulation would fix goop and friends everywhere).
 
 
+## M11 — Windows CI green; 25 more GL hacks
+
+- **M11a ✅ the Windows job builds and packages.** Eight rounds of
+  portability fixes, each one a CI round trip (the last few with
+  `ninja -k 0`, so one run listed everything left):
+  GLAPI resolved to `__declspec(dllimport)` under MSYS2/CLANG64 (which
+  defines `_DLL` for the shared CRT) and was illegal on the GLU
+  definitions; gl4es's `<GL/gl.h>` dragged in all of `<windows.h>` just
+  for APIENTRY, colliding with jwxyz's X11 event-mask macros
+  (`ULONG ControlMask;` -> `ULONG (1<<2);`); MinGW has no `setenv`,
+  `ffs`, or `<sys/wait.h>`; `beats` passed `&tv.tv_sec` to `localtime()`
+  (LLP64: 32-bit `long` vs 64-bit `time_t`); Kilgard's GLUT stroke files
+  called GLUT-internal `__glutFont()`; jwxyz-timers' `select`/`FD_ISSET`
+  needed ws2_32; and `sonar-icmp` included `async_netdb.h` (netdb.h)
+  unconditionally.
+  The interesting one: gl4es exports the plain `gl*` names as aliases of
+  its `gl4es_gl*` entry points, and ANGLE's import library exports the
+  same names -- lld counts an import library as a definition where ELF
+  quietly prefers the static archive. gl4es already suppresses those
+  aliases on Apple/emscripten and mangles callers onto `gl4es_gl*`
+  instead; `_WIN32` now joins that pair in BOTH places (attributes.h and
+  gl.h -- flipping one without the other swaps duplicate symbols for
+  undefined ones). Windows now links exactly as macOS has since M4.
+  Every patch is `_WIN32`-guarded; verified by preprocessing each
+  touched TU against the pre-M11 tree on macOS and emscripten
+  (byte-identical modulo `__FILE__`), plus a clean from-scratch native
+  build.
+
+- **M11b ✅ 25 GL hacks wired (cmake/batch3-glhacks.cmake).** atlantis,
+  atunnel, blocktube, cage, cubocteversion, dymaxionmap, flyingtoasters,
+  gleidescope, glforestfire, glplanet, jigglypuff, lavalite, maze3d,
+  moebius, peepers, platonicfolding, pulsar, sballs, skytentacles,
+  sphereeversion, stairs, timetunnel, unknownpleasures, vigilance,
+  worldpieces -- dependency closures from scripts/gen_glhack_deps.py,
+  all building native and web.
+  Fixed en route (gl4es): `glIsEnabled()` returned GL_FALSE with
+  GL_INVALID_OPERATION for the whole of a glNewList/glEndList block.
+  It is a query -- executed immediately, never compiled -- and
+  xscreensaver's sphere.c/tube.c depend on that: they emit texture
+  coordinates only `if (glIsEnabled(GL_TEXTURE_2D))` and document that
+  callers must enable it outside the list. glplanet does; its globe came
+  out untextured (every vertex sampling one texel of the earth map).
+  Now answered from the shadow state. Re-checked the hacks upstream
+  names as sensitive to this flag (antspotlight, beats, blinkbox,
+  covid19, dangerball, gltext, hilbert, juggler3d, moebius, stairs,
+  topblock, bubble3d): all unchanged.
+
+- Still unwired: 4 GL hacks whose sources do not compile yet
+  (extrusion + its 7 helpers, klondike, mapscroller, molecule) and 17
+  2D hacks (apple2, bsod, bubbles, cwaves, filmleader, flag, glitchpeg,
+  m6502, maze, noseguy, pacman, phosphor, pong, testx11, vfeedback,
+  xanalogtv, xflame) -- the analogtv family among them still blocked on
+  depth-1 XYPixmap XGetImage (see M6c).
+
 ## M3a (emscripten) -- delivered
 
 First WebAssembly build of the xscreensaver codebase (no prior art

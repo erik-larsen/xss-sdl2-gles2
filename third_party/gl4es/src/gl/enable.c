@@ -337,9 +337,21 @@ AliasExport(void,glDisableClientState,,(GLenum cap));
 GLboolean APIENTRY_GL4ES gl4es_glIsEnabled(GLenum cap) {
     DBG(printf("glIsEnabed(%s), list.begin=%d, list.compiling=%d, list.pending=%d\n", PrintEnum(cap), glstate->list.begin, glstate->list.compiling, glstate->list.pending);)
     if(glstate->list.begin) {errorShim(GL_INVALID_OPERATION); return GL_FALSE;}
-    if(glstate->list.compiling) {errorShim(GL_INVALID_OPERATION); return GL_FALSE;}
+    /* PATCH(xss-sdl): glIsEnabled is a query -- it executes immediately,
+       is never compiled into a display list, and reports the prevailing
+       server state. gl4es used to fail it with GL_INVALID_OPERATION (and
+       answer GL_FALSE) for the whole of a glNewList/glEndList block,
+       which quietly breaks callers that follow the documented contract:
+       xscreensaver's sphere.c/tube.c emit texture coordinates only "if
+       (glIsEnabled(GL_TEXTURE_2D))", and say so -- "callers who want a
+       textured sphere have to enable GL_TEXTURE_2D outside of glNewList".
+       glplanet does exactly that, and its globe came out untextured
+       (every vertex sampling one texel of the earth map). Answer from
+       the shadow state instead; only the glBegin/glEnd case above is
+       genuinely an error. The flush below stays off the compiling path:
+       there the active renderlist is the list being built. */
     // should flush for now... but no need if it's just a pending list...
-    if (glstate->list.active && !glstate->list.pending)
+    if (glstate->list.active && !glstate->list.pending && !glstate->list.compiling)
         gl4es_flush();
     GLboolean gles_glIsEnabled(glIsEnabled_ARG_EXPAND); //LOAD_GLES(glIsEnabled);
     noerrorShim();
