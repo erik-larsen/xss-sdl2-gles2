@@ -16,7 +16,10 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Toolchain check (workflow agrees with toolchain.versions)
+        run: python3 scripts/check-toolchain.py
 
       - name: Install build + headless deps
         run: |
@@ -38,7 +41,7 @@ jobs:
 
       - name: Upload native binaries
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xss-sdl-linux
           path: |
@@ -60,21 +63,27 @@ jobs:
   web:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Setup Emscripten (pinned to the validated version)
-        uses: mymindstorm/setup-emsdk@v14
+      - name: Toolchain versions
+        shell: bash
+        run: grep -E '^[A-Z_]+=' toolchain.versions >> "$GITHUB_ENV"
+
+      - name: Setup Emscripten (version from toolchain.versions)
+        uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
         with:
-          version: 3.1.6
+          version: ${{ env.EMSDK_VERSION }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Chrome (for headless WebGL smoke)
         id: chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
+        with:
+          chrome-version: ${{ env.CHROME_VERSION }}
 
       - name: Verify toolchain
         run: emcc --version
@@ -96,7 +105,7 @@ jobs:
 
       - name: Upload web pages
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xss-sdl-web
           path: |
@@ -118,7 +127,7 @@ jobs:
 
       - name: Upload Pages artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: web
 
@@ -138,7 +147,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 
   # ------------------------------------------------------------- Windows
   # MSYS2 CLANG64; native GLES2 via vendored ANGLE (third_party/angle).
@@ -146,12 +155,12 @@ jobs:
   # no llvmpipe/xvfb equivalent, so it's deferred (see MILESTONES.md M4b).
   # Soft-skips with a warning until third_party/angle/lib-win is populated.
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2025
     defaults:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Check vendored ANGLE present
         id: angle
@@ -167,7 +176,7 @@ jobs:
 
       - name: Setup MSYS2 CLANG64
         if: steps.angle.outputs.present == 'true'
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2
         with:
           msystem: CLANG64
           update: true
@@ -218,7 +227,7 @@ jobs:
 
       - name: Upload Windows package
         if: steps.angle.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xss-sdl-windows
           path: dist/xss-sdl-windows
@@ -236,7 +245,7 @@ jobs:
     # not a compile-time constant" and worldpieces will not build.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Check vendored ANGLE present
         id: angle
@@ -270,7 +279,7 @@ jobs:
 
       - name: Upload macOS package
         if: steps.angle.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xss-sdl-macos
           path: dist/xss-sdl-macos

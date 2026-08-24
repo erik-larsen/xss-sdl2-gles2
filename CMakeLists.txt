@@ -46,11 +46,10 @@ if(EMSCRIPTEN)
   # GL_MAX_TEMP_BUFFER_SIZE: gl4es batches immediate-mode geometry into
   # large client-side arrays; emscripten's FULL_ES2 path copies them
   # through a temp VBO whose default max (2MB) is too small for whole-
-  # frame batches, silently breaking draws. TOTAL_STACK: emscripten's
+  # frame batches, silently breaking draws. STACK_SIZE: emscripten's
   # default 64KB C stack vs 8MB native. (Both learned the hard way in
-  # the sibling rss-sdl2-gles2 port.) NB: TOTAL_STACK is the pre-3.1.27
-  # spelling of STACK_SIZE -- CI pins emsdk 3.1.6, which only knows the
-  # old name; newer emscripten accepts it as a legacy alias.
+  # the sibling rss-sdl2-gles2 port.) STACK_SIZE was spelled TOTAL_STACK
+  # before emsdk 3.1.27; the pin (toolchain.versions) is past that now.
   # INITIAL_MEMORY: the default 16MB is the *link-time* floor, and it has
   # to hold the static data before the heap can grow at all. The hacks
   # that embed a world texture (cubocteversion, dymaxionmap, glplanet,
@@ -61,7 +60,7 @@ if(EMSCRIPTEN)
                    -sINITIAL_MEMORY=33554432
                    -sFULL_ES2=1 -sMINIFY_HTML=0
                    -sGL_MAX_TEMP_BUFFER_SIZE=33554432
-                   -sTOTAL_STACK=8388608
+                   -sSTACK_SIZE=8388608
                    --shell-file ${CMAKE_SOURCE_DIR}/src/web/shell.html)
   # NB: emscripten optimization comes from CMAKE_BUILD_TYPE. Use
   # RelWithDebInfo (-O2); -O3 miscompiles gl4es (gears renders blank).

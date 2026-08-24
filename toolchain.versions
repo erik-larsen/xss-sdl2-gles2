@@ -1,0 +1,43 @@
+# Toolchain versions -- the single source of truth for this build.
+#
+# Every version the build depends on and can control lives here, so CI
+# and a developer machine cannot drift apart silently. Lines are strict
+# KEY=VALUE (comments and blanks are filtered out before they reach
+# $GITHUB_ENV); scripts/check-toolchain.py asserts that the workflow
+# agrees with this file, and scripts/setup-toolchain.sh checks a local
+# machine against it.
+#
+# To bump anything: edit here, run scripts/check-toolchain.py, push, and
+# read the CI result. Never edit a version in the workflow directly.
+#
+# What is NOT pinnable, and why -- see docs/TOOLCHAIN.md:
+#   - MSYS2 packages (Windows): pacman carries only current versions and
+#     MSYS2 has no long-term package archive.
+#   - apt / Homebrew packages: pinned in practice by the runner image,
+#     not by us.
+
+# --- toolchains CI installs -------------------------------------------
+# Emscripten. This one number fully determines the web build: SDL2 and
+# libpng come from emscripten ports, not from the system.
+EMSDK_VERSION=4.0.12
+
+# Node + Chrome are the headless verification rig (tests/verify-web.js),
+# not the build. Both are pinned to what CI resolved on 2026-08-24.
+NODE_VERSION=20.20.2
+CHROME_VERSION=152.0.7977.54
+
+# --- runner images ----------------------------------------------------
+# `runs-on:` takes a literal, so these are duplicated in the workflow;
+# scripts/check-toolchain.py fails the build if the two disagree.
+# macos-15 is required: clang 15 on macos-14 rejects the generated
+# aggregate initialisers in hacks/glx/countries.c.
+RUNNER_LINUX=ubuntu-24.04
+RUNNER_MACOS=macos-15
+RUNNER_WINDOWS=windows-2025
+
+# --- vendored, for the record -----------------------------------------
+# These are in third_party/ and therefore already immune to drift. Listed
+# so one file answers "what is this built from?".
+VENDORED_XSCREENSAVER=6.15
+VENDORED_ANGLE=see third_party/angle/README.md
+VENDORED_GLE=github.com/linas/glextrusion master, Aug 2026

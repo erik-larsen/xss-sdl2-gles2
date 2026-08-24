@@ -1,0 +1,17 @@
+# Actions are pinned to commit SHAs (see scripts/check-toolchain.py, which
+# fails the build if one is not). A SHA never moves under you -- the cost
+# is that security fixes never arrive either, so Dependabot proposes the
+# bumps as pull requests and they land when someone reads the diff.
+#
+# It does not know about toolchain.versions: emscripten, node and Chrome
+# are bumped by hand there, deliberately, with a sweep to back the change.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "CI"
+    labels:
+      - toolchain

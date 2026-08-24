@@ -810,6 +810,37 @@ be a driver option).
   assembly demos, and phosphor scrolls green text -- the analogtv family
   is no longer blocked.
 
+## M12 — Toolchain pinning
+
+- **M12a ✅ one file, every version.** `toolchain.versions` is the single
+  source of truth: emsdk, node and Chrome (the headless test rig), the
+  three runner image labels, and the vendored components for the record.
+  CI reads it into `$GITHUB_ENV` and every `with:` takes
+  `${{ env.* }}` -- no version literal appears twice.
+  `scripts/check-toolchain.py` runs in CI and fails the build if the
+  workflow drifts from the file, if a runner image is a floating
+  `-latest` label, or if an action is pinned to a tag rather than a
+  commit SHA (all eight now are, with the tag in a trailing comment;
+  `.github/dependabot.yml` proposes the bumps monthly).
+  `scripts/setup-toolchain.sh` is the developer-side mirror -- it reports
+  what is installed against what is pinned, treats `4.0.12-git` as
+  matching `4.0.12`, and will install the pinned emsdk on request.
+  `windows-latest` is pinned to `windows-2025`, the image it resolved to.
+  docs/TOOLCHAIN.md writes the whole thing up for reuse in the sibling
+  web ports, including what genuinely cannot be pinned (MSYS2 packages:
+  pacman keeps no archive, and freezing the base while installing
+  current packages is the partial-upgrade case MSYS2 warns about).
+
+- **M12b ✅ emsdk 3.1.6 → 4.0.12.** The old pin came from the M3 bring-up
+  sandbox (a Debian emscripten package) and was four generations behind
+  the emsdk this port has actually been developed against since M5c. The
+  bump was also the fix for a red web job: 3.1.6 carries clang 15, which
+  rejects the generated aggregate initialisers in countries.c exactly as
+  clang 15 on macos-14 did, so worldpieces would not link for the web.
+  `-sTOTAL_STACK` became `-sSTACK_SIZE` (renamed in 3.1.27). The
+  `main(void)` + `xss_web_args()` shim stays: it is how query-string
+  options reach a hack, not merely a workaround for 3.1.6's JS glue.
+
 ## M3a (emscripten) -- delivered
 
 First WebAssembly build of the xscreensaver codebase (no prior art

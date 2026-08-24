@@ -6,8 +6,12 @@ argv shim, and a handful of `#ifdef __EMSCRIPTEN__` guards documented
 in MILESTONES.md (M3a).
 
 ## Prerequisites
-- emscripten SDK (tested with 3.1.6) with a writable cache
-- SDL2, zlib, libpng emscripten ports (fetched by emcc on first build)
+- emscripten SDK, the version pinned in `toolchain.versions` (CI installs
+  exactly it; `sh scripts/setup-toolchain.sh` checks or installs it
+  locally -- see docs/TOOLCHAIN.md)
+- SDL2, zlib, libpng emscripten ports (fetched by emcc on first build,
+  and versioned by the SDK, so the pin above fixes the whole web
+  toolchain)
 
 ## Build
     emcmake cmake -B build-web -DCMAKE_BUILD_TYPE=RelWithDebInfo
