@@ -16,6 +16,27 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 WEB=${1:-$(dirname "$HERE")/build-web}
+
+# Staleness guard. build-web on this machine is a dead tree (its CMake
+# cache points at an emscripten path that no longer exists), so it holds
+# whatever was built months ago -- and a sweep of stale artifacts looks
+# exactly like a sweep of broken ones. Compare the page count against the
+# hacks CMake actually registers and say so.
+pages=$(ls "$WEB"/*.html 2>/dev/null | grep -cv '/index\.html$' || true)
+want=$(python3 - <<'EOF' 2>/dev/null || echo 0
+import importlib.util, os
+root = os.path.dirname(os.path.abspath("tests"))
+spec = importlib.util.spec_from_file_location("g", "scripts/gen_gallery.py")
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print(len(m.registered_hacks()))
+EOF
+)
+if [ "$want" -gt 0 ] && [ "$pages" -lt "$want" ]; then
+  echo "WARNING: $WEB has $pages pages but CMake registers $want hacks."
+  echo "         Stale or partial build dir? Build first, or sweep the"
+  echo "         tree you actually built (e.g. build-web-m7)."
+  echo
+fi
 OUT=${2:-$HERE/STATUS-web.tsv}
 PORT=${PORT:-8078}
 JOBS_N=${JOBS_N:-4}

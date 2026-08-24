@@ -21,9 +21,16 @@ const cp = require('child_process');
 function findChrome() {
   if (process.env.CHROME_BIN) return process.env.CHROME_BIN;
   const candidates = [
+    // linux (CI passes CHROME_BIN, but keep these for a local run)
     '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
     '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium', '/usr/bin/chromium-browser',
+    // macOS: no google-chrome on PATH, so the .app paths are the lookup
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    process.env.HOME +
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
   ];
   for (const c of candidates) { try { fs.accessSync(c); return c; } catch (e) {} }
   for (const n of ['google-chrome', 'chromium', 'chromium-browser']) {
