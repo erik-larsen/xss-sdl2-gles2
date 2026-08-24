@@ -56,6 +56,7 @@ Nothing on the machine leaks in.
 ```sh
 sh scripts/setup-toolchain.sh            # what is here vs what is pinned
 sh scripts/setup-toolchain.sh --install  # install the pinned emsdk
+set -a; . ./toolchain.versions; set +a   # load the pins into your shell
 ```
 
 It treats `4.0.12-git` (emcc built from an emsdk checkout) as matching
@@ -64,6 +65,13 @@ which SDL2 the build will actually find. On macOS a `/Library/Frameworks`
 install and a Homebrew dylib are different products with different
 versions, and only one of them is what CI uses; the script makes that
 visible rather than letting it surprise you at push time.
+
+The `grep ... >> "$GITHUB_ENV"` line in the workflow is for the runner
+only: `GITHUB_ENV` names a file that exists inside a job and nowhere
+else, so running that line in your own shell redirects to an empty
+filename and the shell reports "no such file or directory". Every
+`KEY=VALUE` in `toolchain.versions` is a single token with no spaces so
+that both forms work; free-text provenance lives in comments.
 
 ## Bumping emscripten
 

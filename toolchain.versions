@@ -10,6 +10,12 @@
 # To bump anything: edit here, run scripts/check-toolchain.py, push, and
 # read the CI result. Never edit a version in the workflow directly.
 #
+# Reading it:
+#   sh scripts/setup-toolchain.sh          # pins vs what is installed
+#   set -a; . ./toolchain.versions; set +a # load into the current shell
+# The `>> "$GITHUB_ENV"` form in ci.yml is for the runner only -- that
+# variable names a file that exists inside a job and nowhere else.
+#
 # What is NOT pinnable, and why -- see docs/TOOLCHAIN.md:
 #   - MSYS2 packages (Windows): pacman carries only current versions and
 #     MSYS2 has no long-term package archive.
@@ -37,7 +43,10 @@ RUNNER_WINDOWS=windows-2025
 
 # --- vendored, for the record -----------------------------------------
 # These are in third_party/ and therefore already immune to drift. Listed
-# so one file answers "what is this built from?".
+# so one file answers "what is this built from?". Free-text provenance
+# stays in comments: every KEY=VALUE line here has to survive both
+# `>> $GITHUB_ENV` and `set -a; . ./toolchain.versions`, so values are
+# single tokens with no spaces.
 VENDORED_XSCREENSAVER=6.15
-VENDORED_ANGLE=see third_party/angle/README.md
-VENDORED_GLE=github.com/linas/glextrusion master, Aug 2026
+# ANGLE: prebuilt binaries -- see third_party/angle/README.md
+# GLE:   github.com/linas/glextrusion, master as of Aug 2026
