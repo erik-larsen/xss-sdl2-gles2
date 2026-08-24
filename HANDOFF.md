@@ -35,14 +35,18 @@ memory — sweeps burn a lot of tokens and are theirs to launch):
 
 ```sh
 python3 tests/harness.py                 # -> STATUS.csv/.md + thumbnails
-sh tests/sweep-web.sh build-web-m7       # -> STATUS-web.tsv
+sh tests/sweep-web.sh build-web          # -> STATUS-web.tsv
 ```
 
-**Sweep the tree you actually built.** `build-web` is a dead directory
-here (stale CMake cache), and sweeping it silently graded 234 July
-artifacts. The sweep now warns when its page count is below the number
-of registered hacks, and `verify-web.js` knows where macOS keeps Chrome
-(it only had Linux paths, so every local sweep reported "blank").
+**Sweep the tree you actually built.** There is one web build dir again:
+`build-web`, configured against the pinned emsdk. It used to be dead --
+a CMake cache pins the toolchain by absolute path, so when the emsdk
+moved the tree became unusable, and a previous session worked around
+that by starting `build-web-m7` rather than clearing the cache. Both are
+gone; one dir now. The sweep warns when a tree's page count is below the
+number of registered hacks, and `verify-web.js` knows where macOS keeps
+Chrome -- it only had Linux paths, so every local sweep reported
+"blank".
 
 The harness run is what puts the 45 new hacks in the gallery *and*
 generates their thumbnails. The sweep is what validates the emsdk
@@ -110,10 +114,10 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build -j8
 ANGLE_DEFAULT_PLATFORM=metal ./build/gears --frames 90 --shot /tmp/x.ppm
 
-# web -- NB: local `build-web` is dead (stale emscripten path).
-# Use build-web-m7, which is configured against the current emsdk.
-cmake --build build-web-m7 --target decayscreen -j8
-sh scripts/deploy-web.sh build-web-m7      # assembles web/ + gallery
+# web (emsdk comes from toolchain.versions; setup-toolchain.sh checks it)
+emcmake cmake -B build-web -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build-web --target decayscreen -j8
+sh scripts/deploy-web.sh build-web         # assembles web/ + gallery
 ```
 
 CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`,
