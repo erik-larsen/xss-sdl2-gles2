@@ -51,7 +51,14 @@ if(EMSCRIPTEN)
   # the sibling rss-sdl2-gles2 port.) NB: TOTAL_STACK is the pre-3.1.27
   # spelling of STACK_SIZE -- CI pins emsdk 3.1.6, which only knows the
   # old name; newer emscripten accepts it as a legacy alias.
+  # INITIAL_MEMORY: the default 16MB is the *link-time* floor, and it has
+  # to hold the static data before the heap can grow at all. The hacks
+  # that embed a world texture (cubocteversion, dymaxionmap, glplanet,
+  # worldpieces via earth.c) need ~19MB and failed to link with
+  # "wasm-ld: error: initial memory too small". 32MB clears them with
+  # room to spare; ALLOW_MEMORY_GROWTH still handles the rest at runtime.
   add_link_options(-sUSE_SDL=2 -sUSE_LIBPNG=1 -sALLOW_MEMORY_GROWTH=1
+                   -sINITIAL_MEMORY=33554432
                    -sFULL_ES2=1 -sMINIFY_HTML=0
                    -sGL_MAX_TEMP_BUFFER_SIZE=33554432
                    -sTOTAL_STACK=8388608
