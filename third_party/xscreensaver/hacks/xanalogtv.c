@@ -22,6 +22,12 @@
 
 #include "screenhack.h"
 #include "ximage-loader.h"
+#ifdef _WIN32
+/* PATCH(xss-sdl): gethostname() is a winsock call on Windows, not a
+   <unistd.h> one -- the "channel 3" caption puts the host name on the
+   test card. ws2_32 is already linked (jwxyz-timers wants select()). */
+# include <winsock2.h>
+#endif
 #include "analogtv.h"
 
 #include <math.h>

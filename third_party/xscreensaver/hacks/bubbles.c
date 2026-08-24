@@ -49,7 +49,10 @@
 #include <math.h>
 #include <limits.h>
 
-#ifndef VMS
+#if defined(_WIN32)
+/* PATCH(xss-sdl): MinGW has no <sys/wait.h>, and nothing here uses it --
+   bubbles never forks (same as xmatrix). */
+#elif !defined(VMS)
 # include <sys/wait.h>
 #else /* VMS */
 # if __DECC_VER >= 50200000

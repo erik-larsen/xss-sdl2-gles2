@@ -229,7 +229,12 @@ jobs:
   # The runner arch must match the vendored dylibs: macos-14 = arm64,
   # macos-13 = x86_64. Builds + packages; smoke deferred like Windows.
   macos:
-    runs-on: macos-14
+    # macos-15 for Xcode 16 / clang 16. The generated country data in
+    # hacks/glx/countries.c initialises static const aggregates from
+    # other static const aggregates -- gcc and clang 16 fold that,
+    # clang 15 on the macos-14 image calls it "initializer element is
+    # not a compile-time constant" and worldpieces will not build.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
