@@ -24,9 +24,14 @@
 #include "ximage-loader.h"
 #ifdef _WIN32
 /* PATCH(xss-sdl): gethostname() is a winsock call on Windows, not a
-   <unistd.h> one -- the "channel 3" caption puts the host name on the
-   test card. ws2_32 is already linked (jwxyz-timers wants select()). */
-# include <winsock2.h>
+   <unistd.h> one -- the caption on the test card is the host name.
+   Declaring it beats including <winsock2.h>, which drags in windows.h,
+   whose struct members collide with the X11 macros jwxyz.h has already
+   defined by this point (processthreadsapi.h's "ULONG ControlMask;"
+   becomes "ULONG (1<<2);" -- the same trap gl4es's gl.h set). ws2_32 is
+   already on the link line for jwxyz-timers' select(). Without
+   WSAStartup the call just fails, and the caption is skipped. */
+int __stdcall gethostname (char *name, int namelen);
 #endif
 #include "analogtv.h"
 
