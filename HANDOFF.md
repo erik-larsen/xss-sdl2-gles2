@@ -7,131 +7,166 @@ upstream hack source.
 
 ## Orient yourself
 
-- **`MILESTONES.md`** — the authoritative running log (M0 → M6g), every
+- **`MILESTONES.md`** — the authoritative running log (M0 → M12), every
   decision and fix with rationale. Read the recent entries.
-- **`tests/STATUS.md`** — per-hack pass/blank/crash sheet.
-- **`README.md`** — architecture diagram + build/run for all targets.
-- Prior session transcripts live in
-  `~/.claude/projects/-Users-larsens-Github-xss-sdl2-gles2/*.jsonl`
-  (searchable via the `ccd_session_mgmt` MCP if connected — but this doc
-  + MILESTONES should be enough).
+- **`docs/TOOLCHAIN.md`** — how versions are pinned, and what cannot be.
+- **`tests/STATUS.md`** — per-hack pass/blank/crash sheet (harness output).
+- **`README.md`** — architecture + build/run for all targets.
 
-## Current state (2026-08 / commit `2021018`)
+## Current state (2026-08, commit `081b687`)
 
-- **233 / 233 shipping hacks pass** — 0 blank, 0 crash on macOS/ANGLE and
-  as WebAssembly.
-- **Live gallery: https://erik-larsen.github.io/xss-sdl2-gles2/** —
-  ~257 MB, auto-deployed by CI (Pages) on push to `main`.
-- **CI**: Linux ✓, macOS ✓, web ✓; **Windows WIP** (see below).
-- Working tree clean; everything pushed.
+- **278 hacks wired** — every shipping xscreensaver hack whose source
+  this port can build. 233 of them are harness+sweep verified; the 45
+  added in M11 are built and spot-checked but **not yet swept**.
+- **CI: all five jobs green** as of the M12 push (linux, macos, windows,
+  web, pages). Windows went green for the first time in M11a.
+- **Live gallery**: https://erik-larsen.github.io/xss-sdl2-gles2/ —
+  still shows **233 cards**, because `gen_gallery.py` only cards hacks
+  that `tests/STATUS.csv` marks `pass`/`static`. See next steps.
+- Toolchain is pinned in **`toolchain.versions`** (emsdk 4.0.12, node
+  20.20.2, chrome 152.0.7977.54, images ubuntu-24.04 / macos-15 /
+  windows-2025). Actions are SHA-pinned; `scripts/check-toolchain.py`
+  enforces all of it in CI.
+
+## Next steps
+
+**1. The user runs these; you do not** (see the `no-automatic-test-runs`
+memory — sweeps burn a lot of tokens and are theirs to launch):
+
+```sh
+python3 tests/harness.py            # -> STATUS.csv/.md + thumbnails
+sh tests/sweep-web.sh build-web     # -> STATUS-web.tsv
+```
+
+The harness run is what puts the 45 new hacks in the gallery *and*
+generates their thumbnails. The sweep is what validates the emsdk
+3.1.6 → 4.0.12 jump (four generations; codegen under gl4es is the part
+most likely to notice). When results come back:
+
+- Fold the real numbers into `README.md` — it currently says "233 of
+  them are verified end to end… the 45 added in M11 build native and web
+  and render correctly in native spot checks", which is deliberately
+  hedged until a sweep says otherwise.
+- The gallery count should reach 278 on the next push.
+
+**2. `glitchpeg` — the one wired hack that renders blank.** It
+`popen()`s `xscreensaver-getimage-file` to *name* a file, then corrupts
+the JPEG bytes itself. Options, cheapest first: point its filename
+function at `assets/images/` on native and write one prefetched image
+into MEMFS on web (the shell already has the bytes in
+`Module.xssImages`); or give the port a tiny `xscreensaver-getimage-file`
+shim. Either way it is a port patch, not plumbing.
+
+**3. Windows runtime bring-up (M4b).** The job builds and packages; no
+binary has ever been *run*. Expect ANGLE/EGL surface issues, and note
+that gl4es reaches ANGLE through `SDL_GL_GetProcAddress`, so a runtime
+failure is more likely in context creation than in symbol resolution.
+
+**4. Vendor SDL2 + libpng (the deferred "tier 3").** This is the last
+real longevity gap:
+- MSYS2 packages cannot be pinned (no archive), so Windows can break
+  with no commit of yours.
+- macOS is worse than it looks: your machine links
+  `/Library/Frameworks/SDL2.framework` **2.30.3** while CI links
+  `brew install sdl2` — different products, neither pinned.
+Vendoring them into `third_party/` the way ANGLE already is closes both.
+
+**5. Port the pinning recipe** to `sgi-demos` and
+`emscripten-sdl2-gles2` — this was the stated reason for M12.
+`docs/TOOLCHAIN.md` ends with the four files + one habit to copy.
+
+**6. Native follow-ups** (from the M9 review, all native parity):
+boxfit/halo/lightning/moire2/rocks/strange blank-or-nearly at 30s; goop
+renders opaque (jwxyz lacks X11 plane-mask transparency); vermiculate
+accumulates very slowly.
 
 ## Build / run quick reference
 
 ```sh
-# native (macOS): brew install cmake ninja sdl2 libpng
-cmake -B build -G Ninja && cmake --build build
-./build/gears
+sh scripts/setup-toolchain.sh              # pins vs what is installed
 
-# web: needs emsdk. CI pins 3.1.6; local dev used 4.0.12 (both fine)
-emcmake cmake -B build-web -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
-cmake --build build-web && sh scripts/deploy-web.sh build-web
+# native (macOS): brew install cmake ninja libpng; SDL2 from /Library/Frameworks
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build -j8
+ANGLE_DEFAULT_PLATFORM=metal ./build/gears --frames 90 --shot /tmp/x.ppm
 
-# verify
-sh tests/smoke.sh build                    # native smoke
-python3 tests/harness.py --build build     # full per-hack sweep -> STATUS
-sh tests/smoke-web.sh build-web            # browser (headless Chrome)
+# web -- NB: local `build-web` is dead (stale emscripten path).
+# Use build-web-m7, which is configured against the current emsdk.
+cmake --build build-web-m7 --target decayscreen -j8
+sh scripts/deploy-web.sh build-web-m7      # assembles web/ + gallery
 ```
 
-CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`.
+CLI on every hack: `--width/--height/--frames N/--shot out.ppm/--fps`,
+plus the hack's own options (`-duration 5`, `-verbose`, …). On web the
+same options come from the query string: `?frames=60&shot=out.ppm`.
 
 ## Conventions (don't relearn these)
 
-- **Hack source is never edited** except tiny vendored fixes tagged
-  `PATCH(xss-sdl)`. Port hooks live in `src/port/` (fonts = jwxyz-font.c,
-  text = textclient-sdl.c, image = grabclient-sdl.c) — the port fills the
-  Android/iOS platform hooks so hacks compile unmodified.
-- **Hacks are registered in `CMakeLists.txt`**; GL-hack dependency lists
-  are generated by `scripts/gen_glhack_deps.py` (symbol-closure over
-  compiled objects) into `cmake/batch2-glhacks.cmake` — regenerate, don't
-  hand-edit.
-- Fonts embedded via `scripts/bin2c.py`; gallery via
-  `scripts/gen_gallery.py` (reads CMake registrations + STATUS + harness
-  screenshots in `/tmp/xss_harness`).
+- **Hack source is never edited** except vendored fixes tagged
+  `PATCH(xss-sdl)`. Port hooks live in `src/port/` (fonts =
+  jwxyz-font.c, text = textclient-sdl.c, image = grabclient-sdl.c).
+- **Registration**: `CMakeLists.txt` for 2D, `cmake/batch{2,3}-glhacks.cmake`
+  for GL — generated by `scripts/gen_glhack_deps.py` (symbol closure).
+  Regenerate, don't hand-edit. `XSCREENSAVER_MODULE_2`'s *middle*
+  argument is the table prefix, so plain `xss_add_glhack` is right;
+  `_p` is only for b_lockglue/sproingiewrap, where the file name and the
+  module name genuinely differ.
+- **Embedded assets**: `scripts/png2c.py` (upstream ad2c format, verified
+  byte-identical against a vendored header), `scripts/gen_ad2c.py` for
+  molecules.h / m6502.h, `scripts/bin2c.py` for fonts.
+- **Never edit a version outside `toolchain.versions`.**
 
-## Gotchas that cost time this session
+## Gotchas that cost time (this session and before)
 
-- **ANGLE Metal backend (macOS)**: the vendored ANGLE defaults to a slow
-  GL-on-Metal path (per-draw GPU sync). The driver now forces
-  `ANGLE_DEFAULT_PLATFORM=metal` on `__APPLE__` native — 50–200× faster.
-  If anything is GPU-bound-slow on mac, check this first. (Also applies to
-  the sibling rss-sdl2-gles2 project.)
-- **Web wasm size**: RelWithDebInfo `-g` DWARF was ~77 % of each `.wasm`;
-  emscripten build uses `-O2 -g0` (NOT `-O3` — that miscompiles gl4es).
-- **jwxyz "black" bugs** were usually clipping/colour-model, not GL:
-  fill_rects off-screen wrap, draw_line edge-rejection (now Cohen-
-  Sutherland clipped), BlackPixel == alpha_mask (0xFF000000) breaking
-  white-on-black readback thresholds, GLES2 having no `glLogicOp`.
-- **zsh word-splitting**: use `${=VAR}` or run hacks individually; `sample
-  <pid>` needs `/usr/bin/sample`; macOS has no `timeout`.
-- **Web GL context has alpha:8 + pre-swap alpha clamp** (M8a): needed so
-  no-clear trails hacks (noof) can glCopyTexSubImage2D from the drawing
-  buffer; don't set ALPHA_SIZE back to 0 on web, and don't remove
-  clamp_alpha() — without it the browser composites the page through
-  the canvas.
-- **No-clear hacks** (M8): noof self-restores (works after M8a);
-  flurry can't and gets a driver-level retained framebuffer
-  (xss_gl_frame_begin/end in glx-sdl.c, retain list keyed by
-  progclass). Any future hack that composites over the previous frame
-  without clearing goes in that list.
-- **Web rendering verdicts: use headless, never the browser pane**
-  (M9): the in-app pane throttles rAF to ~0 when occluded — "still
-  black" there proves nothing. `tests/sweep-web.sh` sweeps every built
-  page into tests/STATUS-web.tsv; `tests/verify-web.js` for one page.
+- **`ANGLE_DEFAULT_PLATFORM=metal` on macOS** — the vendored ANGLE
+  defaults to a slow GL-on-Metal path. 50–200× faster with it.
+- **Web verdicts: use headless, never the in-app browser pane.** Chrome
+  pauses rAF in a hidden page, so the pane freezes on a stale frame and
+  "still broken" there proves nothing. Cost an hour chasing a carousel
+  "bug" that was the pane being hidden.
+- **jwxyz read-back keeps its alpha.** `BlackPixel == alpha_mask`
+  (0xFF000000), so a read-back pixel must keep those bits or
+  `XGetPixel(im,x,y) == BlackPixelOfScreen` never matches — that is how
+  phosphor/apple2 capture their fonts. An earlier patch stripped alpha
+  and blamed the resulting blank glyphs on those very hacks; it is
+  removed (M11d). Do not reinstate it.
+- **Windows: `windows.h` vs jwxyz's X11 macros.** Anything that pulls in
+  windows.h *after* jwxyz.h explodes in `processthreadsapi.h`
+  (`ULONG ControlMask;` → `ULONG (1<<2);`). Bit twice: gl4es's `gl.h`
+  (M11a) and a `<winsock2.h>` include (M11). Declare the call you need
+  instead.
+- **gl4es name mangling has two halves.** On Apple/emscripten/_WIN32 the
+  header mangles callers to `gl4es_gl*` and the alias exports are off;
+  elsewhere it is the reverse. Flip one without the other and you get
+  duplicate symbols (or undefined ones) — see `attributes.h` + `gl.h`.
+- **`glIsEnabled` during display-list compile** returned GL_FALSE in
+  gl4es. sphere.c/tube.c gate texture coordinates on it, so glplanet's
+  globe came out white. Fixed in M11b; the general lesson is that
+  queries must execute during compilation, never be deferred.
+- **emscripten `INITIAL_MEMORY` is a link-time floor**, not just a
+  runtime hint: the earth.c hacks need 32MB before `ALLOW_MEMORY_GROWTH`
+  can do anything.
+- **Toolchains differ between your machine and CI in ways that hide
+  bugs.** Local emsdk 4.0.12 masked the INITIAL_MEMORY failure; local
+  clang 16 masked the `countries.c` initializer failure that clang 15
+  (macos-14, and emsdk 3.1.6) rejects. `scripts/setup-toolchain.sh`
+  exists to make that visible.
+- **Web GL context has alpha:8 + pre-swap alpha clamp** (M8a) — needed
+  for no-clear trails hacks; don't undo `clamp_alpha()`.
+- **No-clear hacks** (M8): flurry gets a driver-level retained
+  framebuffer keyed by progclass in glx-sdl.c. New hacks that composite
+  over the previous frame go in that list.
 - **gl4es on web needs the pre-swap flush + FULL_ES2 desync patches**
-  (M9b/M9c): gl4es interposes ALL GL symbols in GL-hack binaries, and
-  emscripten's FULL_ES2 flips real GL state behind gl4es's shadow
-  caches. Don't re-guard xss_gl_pre_swap with #ifndef __EMSCRIPTEN__,
-  and keep the PATCH(xss-sdl) blocks in third_party/gl4es (fpe.c,
-  buffers.c) + the -sGL_MAX_TEMP_BUFFER_SIZE/-sSTACK_SIZE link flags.
+  (M9b/M9c). Keep the `PATCH(xss-sdl)` blocks in third_party/gl4es
+  (fpe.c, buffers.c) and the `-sGL_MAX_TEMP_BUFFER_SIZE` /
+  `-sSTACK_SIZE` link flags.
+- **The driver's own GL calls bypass gl4es** (it includes
+  `SDL_opengles2.h`, so plain `gl*` binds to ANGLE/WebGL). Anything the
+  driver does behind gl4es's back desyncs its state cache — that is why
+  the blit texture and VBO are skipped entirely for GL hacks (M11b).
+- **zsh word-splitting**: use `${=VAR}`; macOS has no `timeout(1)`.
 
-## Pending work (prioritized)
+## Excluded by design (don't "fix" these)
 
-**Gallery metadata / settings** (see MILESTONES M7):
-1. ~~Author/year + one-line description on gallery cards~~ — **done
-   (M7a)**. Config XMLs now vendored at
-   `third_party/xscreensaver/hacks/config/` (matches 6.15);
-   gen_gallery.py parses label/description/author/year.
-2. ~~Live web settings panel~~ — **done (M7b)**: gear button on every
-   hack page → drawer built from `options.json`
-   (scripts/gen_options.py, hooked into deploy-web.sh). En-route port
-   fixes: `--foo`→`-foo` option matching, web-lenient unknown args,
-   %-decoding in xss_web_args. NB: local `build-web` is dead (stale
-   emscripten path) — use `build-web-m7` (current emsdk) or reconfigure.
-3. Native `--help` option tables (rss-port did this with a gen script).
-
-**Image hacks** now use the bundled CC0 landscape set (M10,
-`assets/images/` + provenance README; native reads the dir, web
-prefetches one image per page in the shell). Colour bars remain the
-no-image fallback. Desktop-GL default-texture-0 use (discoball, cube21,
-raverhoop, ...) works on WebGL via the gl4es zero-texture patch (M10b).
-
-**Native follow-ups** (found in the M9 review, all native parity):
-boxfit/halo/lightning/moire2/rocks/strange blank-or-nearly at 30s;
-goop renders opaque (jwxyz lacks X11 plane-mask transparency);
-vermiculate accumulates very slowly; a global fps cap is a possible
-driver option.
-
-**Platform**
-- **Windows native build** — actively in progress (tip commit added
-  `mesa_wgl.h`). CI Windows job gated on vendored ANGLE + historically
-  fails at configure/build. The one genuinely *incomplete* platform.
-
-**Deferred hacks** (~15 of ~250, each its own mini-project — see
-MILESTONES M6c/M6f/M6g for what's already solved vs. remaining):
-- analogtv family: `apple2`, `xanalogtv`, `bsod` (NTSC sim + ansi-tty)
-- `phosphor` (crash + block-glyphs fixed; glyph→screen blit still
-  cursor-only)
-- `molecule` (needs upstream PDB data / molecules.h)
-- `xshadertoy` (shader asset bundling)
-- `noseguy` (nose image PNGs not vendored)
-- `extrusion` (support files don't compile)
+`mapscroller` and `webcollage` fetch over the network through a helper
+process — no subprocess, no network, and no `fork()` on the web.
