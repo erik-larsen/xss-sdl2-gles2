@@ -34,9 +34,15 @@ upstream hack source.
 memory — sweeps burn a lot of tokens and are theirs to launch):
 
 ```sh
-python3 tests/harness.py            # -> STATUS.csv/.md + thumbnails
-sh tests/sweep-web.sh build-web     # -> STATUS-web.tsv
+python3 tests/harness.py                 # -> STATUS.csv/.md + thumbnails
+sh tests/sweep-web.sh build-web-m7       # -> STATUS-web.tsv
 ```
+
+**Sweep the tree you actually built.** `build-web` is a dead directory
+here (stale CMake cache), and sweeping it silently graded 234 July
+artifacts. The sweep now warns when its page count is below the number
+of registered hacks, and `verify-web.js` knows where macOS keeps Chrome
+(it only had Linux paths, so every local sweep reported "blank").
 
 The harness run is what puts the 45 new hacks in the gallery *and*
 generates their thumbnails. The sweep is what validates the emsdk
@@ -48,6 +54,20 @@ most likely to notice). When results come back:
   and render correctly in native spot checks", which is deliberately
   hedged until a sweep says otherwise.
 - The gallery count should reach 278 on the next push.
+
+**1a. Three hacks the first full harness run flagged** (274 pass, 1
+static, 2 blank, 1 crash of 278 -- `tests/STATUS.md` has the sheet):
+
+- **`dymaxionmap` — unusably slow, not crashed.** The harness calls it a
+  timeout; measured directly it is worse than 20 s/frame (30 frames blew
+  a 10-minute cap). Everything else in its batch is fine, including
+  `worldpieces`, which shares `earth.c`, so suspect its own per-frame
+  work rather than the shared texture. Profile before optimising.
+- **`vigilance` — renders nothing** (0 non-black pixels at 300 frames).
+  It wired and links; something in its own draw path.
+- **`penetrate` — static**, i.e. it renders but two shots 23 frames
+  apart are identical. Probably a slow attract mode; check with a much
+  larger frame gap before treating it as a bug.
 
 **2. `glitchpeg` — the one wired hack that renders blank.** It
 `popen()`s `xscreensaver-getimage-file` to *name* a file, then corrupts
