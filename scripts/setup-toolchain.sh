@@ -55,13 +55,45 @@ else
   MISMATCH=1
 fi
 
-for t in cmake ninja python3 node; do
+for t in cmake ninja python3; do
   if command -v "$t" > /dev/null 2>&1; then
     say "  $t" "$("$t" --version 2>&1 | head -1)"
   else
     say "  $t" "not found"
   fi
 done
+
+# node and Chrome do not affect what gets built -- they are the headless
+# verification rig (tests/verify-web.js). A mismatch still matters,
+# because the sweep is how a toolchain bump gets believed, so it warns
+# rather than fails: a different major can change puppeteer's behaviour
+# and hand you verdicts CI will not reproduce.
+if command -v node > /dev/null 2>&1; then
+  have=$(node --version | sed 's/^v//')
+  if [ "${have%%.*}" = "${NODE_VERSION%%.*}" ]; then
+    say "  node (tests)" "v$have"
+  else
+    say "  node (tests)" "v$have  <-- PINNED IS $NODE_VERSION (sweep may differ from CI)"
+    SOFT=1
+  fi
+else
+  say "  node (tests)" "not found"
+fi
+
+CHROME_APP="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+if [ -n "${CHROME_BIN:-}" ] && [ -x "${CHROME_BIN}" ]; then
+  say "  chrome (tests)" "$("$CHROME_BIN" --version 2>/dev/null) (CHROME_BIN)"
+elif [ -x "$CHROME_APP" ]; then
+  have=$("$CHROME_APP" --version 2>/dev/null | sed 's/^Google Chrome //')
+  if [ "${have%%.*}" = "${CHROME_VERSION%%.*}" ]; then
+    say "  chrome (tests)" "$have"
+  else
+    say "  chrome (tests)" "$have  <-- PINNED IS $CHROME_VERSION (sweep may differ from CI)"
+    SOFT=1
+  fi
+else
+  say "  chrome (tests)" "not found (verify-web.js will look for it)"
+fi
 
 # SDL2 and libpng are the two native dependencies CMake resolves from the
 # system. Report where they came from -- on macOS a Frameworks install and
@@ -89,6 +121,13 @@ if [ "${1:-}" = "--install" ]; then
   echo "activate it in this shell with:"
   echo "  . $EMSDK_DIR/emsdk_env.sh"
   exit 0
+fi
+
+if [ -n "${SOFT:-}" ] && [ -z "${MISMATCH:-}" ]; then
+  echo
+  echo "note: the build is pinned and matches; only the test rig differs."
+  echo "The sweep will still run -- just remember CI verifies with"
+  echo "node $NODE_VERSION / chrome $CHROME_VERSION when the two disagree."
 fi
 
 if [ -n "${MISMATCH:-}" ]; then
