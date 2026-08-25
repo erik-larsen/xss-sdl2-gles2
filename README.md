@@ -16,13 +16,17 @@ hack source.
 ## Status
 
 **278 hacks wired**, which is every shipping xscreensaver hack whose
-source this port can build. 233 of them are verified end to end —
-headless harness (clean exit, non-blank, frame-to-frame motion) plus a
-full web sweep, and by eye, natively on macOS/ANGLE and as WebAssembly.
-The 45 added in M11 build native and web and render correctly in native
-spot checks; their first harness run is what will fold them into
-`tests/STATUS.md` and the gallery. `MILESTONES.md` has the full
-development log.
+source this port can build, and both suites have now run over all of
+them:
+
+- **Native** (macOS/ANGLE): 274 pass, `penetrate` static, `dymaxionmap`
+  too slow to sample, `glitchpeg` and `vigilance` blank.
+- **Web** (headless Chromium, 279 pages): 277 render. The same two are
+  blank; `lightning` needs ~30 s to draw anything and `peepers` renders
+  very dark, so both sit near the verifier's threshold.
+
+`tests/STATUS.md` is the per-hack sheet, `tests/STATUS-web.tsv` the web
+one, and `MILESTONES.md` has the full development log.
 
 | Area | State |
 |---|---|

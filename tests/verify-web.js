@@ -86,16 +86,34 @@ function delta(a, b) {
       { timeout: 30000 }).catch(() => {});
     await new Promise(r => setTimeout(r, waitMs));
     const c = await page.$('#canvas');
-    const A = await c.screenshot();
+    // Sample twice, 700ms apart: the pair gives both "is anything there"
+    // and "does it move". A blank pair gets one more chance after a
+    // longer wait, the way tests/harness.py already retries natively --
+    // several hacks are simply slow to put anything on screen (lightning)
+    // or spend their opening seconds dark (vfeedback, boxfit), and a
+    // single early sample calls those blank at random.
+    let A = await c.screenshot();
     await new Promise(r => setTimeout(r, 700));
-    const B = await c.screenshot();
+    let B = await c.screenshot();
+    let sb = stats(B);
+    let retried = false;
+
+    if (!(sb.maxLum > 16 && sb.nonBlackFrac > 0.0003)) {
+      retried = true;
+      await new Promise(r => setTimeout(r, waitMs * 2));
+      A = await c.screenshot();
+      await new Promise(r => setTimeout(r, 700));
+      B = await c.screenshot();
+      sb = stats(B);
+    }
+
     fs.writeFileSync(outPng, B);
-    const sb = stats(B);
     verdict = {
       nonBlank: (sb.maxLum > 16 && sb.nonBlackFrac > 0.0003),
       nonBlackFrac: +sb.nonBlackFrac.toFixed(4),
       maxLum: sb.maxLum, colors: sb.colors, delta: +delta(A, B).toFixed(4),
     };
+    if (retried) verdict.retried = true;
   } catch (e) {
     verdict = { nonBlank: false, error: String(e) };
   } finally {
