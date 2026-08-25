@@ -13,65 +13,60 @@ upstream hack source.
 - **`tests/STATUS.md`** — per-hack pass/blank/crash sheet (harness output).
 - **`README.md`** — architecture + build/run for all targets.
 
-## Current state (2026-08, commit `081b687`)
+## Current state (2026-08, commit `759bd18`)
 
 - **278 hacks wired** — every shipping xscreensaver hack whose source
-  this port can build. 233 of them are harness+sweep verified; the 45
-  added in M11 are built and spot-checked but **not yet swept**.
-- **CI: all five jobs green** as of the M12 push (linux, macos, windows,
-  web, pages). Windows went green for the first time in M11a.
+  this port can build. Both suites have run over all of them:
+  - native (macOS/ANGLE): **274 pass**, `penetrate` static,
+    `dymaxionmap` too slow to sample, `glitchpeg` + `vigilance` blank.
+  - web (headless Chromium, 279 pages): **277 render**; same two blank.
+- **CI: all five jobs green** (linux, macos, windows, web, pages).
+  Windows went green for the first time in M11a.
 - **Live gallery**: https://erik-larsen.github.io/xss-sdl2-gles2/ —
-  still shows **233 cards**, because `gen_gallery.py` only cards hacks
-  that `tests/STATUS.csv` marks `pass`/`static`. See next steps.
+  **275 cards** (`gen_gallery.py` cards what `tests/STATUS.csv` marks
+  `pass`/`static`).
 - Toolchain is pinned in **`toolchain.versions`** (emsdk 4.0.12, node
   20.20.2, chrome 152.0.7977.54, images ubuntu-24.04 / macos-15 /
   windows-2025). Actions are SHA-pinned; `scripts/check-toolchain.py`
-  enforces all of it in CI.
+  enforces all of it in CI. The emsdk 3.1.6 → 4.0.12 bump is verified by
+  the sweep above: no regressions, no clusters.
 
 ## Next steps
 
-**1. The user runs these; you do not** (see the `no-automatic-test-runs`
-memory — sweeps burn a lot of tokens and are theirs to launch):
+**1. Re-run the suites after any substantive change** — they are the
+user's to launch, not yours (see the `no-automatic-test-runs` memory):
 
 ```sh
 python3 tests/harness.py                 # -> STATUS.csv/.md + thumbnails
 sh tests/sweep-web.sh build-web          # -> STATUS-web.tsv
 ```
 
-**Sweep the tree you actually built.** There is one web build dir again:
-`build-web`, configured against the pinned emsdk. It used to be dead --
-a CMake cache pins the toolchain by absolute path, so when the emsdk
-moved the tree became unusable, and a previous session worked around
-that by starting `build-web-m7` rather than clearing the cache. Both are
-gone; one dir now. The sweep warns when a tree's page count is below the
-number of registered hacks, and `verify-web.js` knows where macOS keeps
-Chrome -- it only had Linux paths, so every local sweep reported
-"blank".
+Both are current as of `759bd18`, and committing their output is what
+moves the gallery. There is one web build dir (`build-web`, pinned
+emsdk); the sweep refuses to run against a foreign server or a stale
+tree, and `verify-web.js` finds Chrome on macOS and retries a blank
+sample once. All three of those guards exist because the rig produced
+three separate false catastrophes in one session — see the gotcha below.
 
-The harness run is what puts the 45 new hacks in the gallery *and*
-generates their thumbnails. The sweep is what validates the emsdk
-3.1.6 → 4.0.12 jump (four generations; codegen under gl4es is the part
-most likely to notice). When results come back:
+**1a. What the suites flagged, and how much is real:**
 
-- Fold the real numbers into `README.md` — it currently says "233 of
-  them are verified end to end… the 45 added in M11 build native and web
-  and render correctly in native spot checks", which is deliberately
-  hedged until a sweep says otherwise.
-- The gallery count should reach 278 on the next push.
-
-**1a. Three hacks the first full harness run flagged** (274 pass, 1
-static, 2 blank, 1 crash of 278 -- `tests/STATUS.md` has the sheet):
-
-- **`dymaxionmap` — unusably slow, not crashed.** The harness calls it a
-  timeout; measured directly it is worse than 20 s/frame (30 frames blew
-  a 10-minute cap). Everything else in its batch is fine, including
-  `worldpieces`, which shares `earth.c`, so suspect its own per-frame
-  work rather than the shared texture. Profile before optimising.
-- **`vigilance` — renders nothing** (0 non-black pixels at 300 frames).
-  It wired and links; something in its own draw path.
-- **`penetrate` — static**, i.e. it renders but two shots 23 frames
-  apart are identical. Probably a slow attract mode; check with a much
-  larger frame gap before treating it as a bug.
+- **`dymaxionmap` — unusably slow, not crashed.** Worse than 20 s/frame
+  natively (30 frames blew a 10-minute cap), so the harness times out.
+  It renders fine on the web. `worldpieces` shares `earth.c` and is
+  fine, so suspect dymaxionmap's own per-frame work. Profile first.
+- **`vigilance` — renders nothing**, native and web alike. Wires and
+  links; something in its own draw path.
+- **`peepers` — renders very dark on the web only** (maxLum 18–44
+  against 95,948 colors natively), which puts it right on the
+  verifier's `maxLum > 16` threshold. A real web-side difference worth
+  chasing, not a rig artifact.
+- **`lightning` — takes ~30 s to draw anything**, on both platforms.
+  Already on the native follow-up list; nothing new.
+- **`penetrate` — static** natively: renders, but two shots 23 frames
+  apart match. Probably a slow attract mode; re-check with a much larger
+  frame gap before treating it as a bug.
+- `boxfit` and `vfeedback` were *rig* flakiness, now fixed by the blank
+  retry. They render.
 
 **2. `glitchpeg` — the one wired hack that renders blank.** It
 `popen()`s `xscreensaver-getimage-file` to *name* a file, then corrupts
@@ -144,6 +139,14 @@ same options come from the query string: `?frames=60&shot=out.ppm`.
 
 - **`ANGLE_DEFAULT_PLATFORM=metal` on macOS** — the vendored ANGLE
   defaults to a slow GL-on-Metal path. 50–200× faster with it.
+- **A uniform result across every hack is the harness, not the hacks.**
+  Three separate rig failures in one session each looked like total
+  breakage: `findChrome()` knew only Linux paths (234/234 blank), an
+  http.server left over from an aborted run held the port so every page
+  404'd (279/279 blank), and a single early sample called slow starters
+  blank (6 false blanks). Real regressions cluster by subsystem; they do
+  not hit all 279 identically. Each of those now fails loudly in a
+  second.
 - **Web verdicts: use headless, never the in-app browser pane.** Chrome
   pauses rAF in a hidden page, so the pane freezes on a stale frame and
   "still broken" there proves nothing. Cost an hour chasing a carousel
