@@ -45,6 +45,31 @@ SRV=$!
 trap 'kill $SRV 2>/dev/null' EXIT
 sleep 1
 
+# The server has to be OURS. An http.server left behind by an aborted run
+# holds the port; ours then exits silently (its stderr is discarded) and
+# every page 404s, which the verifier reports as a null #canvas -- i.e. a
+# whole sweep of blanks that has nothing to do with the hacks. That has
+# now happened twice, so check before spending an hour on it.
+probe=$(ls "$WEB"/*.html | sed 's|.*/||' | grep -v '^index\.html$' | head -1)
+if ! python3 - "$PORT" "$probe" <<'PROBE'
+import sys, urllib.request
+port, page = sys.argv[1], sys.argv[2]
+try:
+    with urllib.request.urlopen("http://localhost:%s/%s" % (port, page),
+                                timeout=5) as r:
+        sys.exit(0 if r.status == 200 else 1)
+except Exception:
+    sys.exit(1)
+PROBE
+then
+  echo "ERROR: http://localhost:$PORT/$probe is not served from $WEB."
+  echo "       Something else is on port $PORT -- an aborted sweep leaves"
+  echo "       its server running:"
+  lsof -nP -iTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | sed 's/^/         /'
+  echo "       Kill it, or re-run with PORT=<other>."
+  exit 1
+fi
+
 : > "$OUT"
 ls "$WEB"/*.html | sed 's|.*/||; s|\.html$||' | grep -v '^index$' | \
 xargs -P "$JOBS_N" -n 1 sh -c '
