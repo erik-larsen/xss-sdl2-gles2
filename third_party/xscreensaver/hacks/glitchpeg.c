@@ -160,6 +160,7 @@ draw_image (Display *dpy, Window window, Visual *v, GC gc,
 }
 
 
+#ifndef XSS_SDL_PORT
 # define BACKSLASH(c) \
   (! ((c >= 'a' && c <= 'z') || \
       (c >= 'A' && c <= 'Z') || \
@@ -277,6 +278,8 @@ xscreensaver_getimage_file_cb (XtPointer closure, int *source, XtInputId *id)
       exit (1);
     }
 }
+#endif /* !XSS_SDL_PORT -- PATCH(xss-sdl): no helper program to popen();
+          the port loads image bytes synchronously in glitchpeg_draw. */
 
 
 static void *
@@ -324,12 +327,34 @@ glitchpeg_draw (Display *dpy, Window window, void *closure)
       !st->pipe)
     {
       /* Time to reload */
+#ifdef XSS_SDL_PORT
+      /* PATCH(xss-sdl): xscreensaver-getimage-file does not exist here.
+         Pull the raw bytes of a bundled JPEG straight from the port's
+         image source (assets/images natively, the shell's prefetched
+         set on the web) instead of popen()ing a helper for a filename.
+         Failure just retries next frame -- on the web the image list
+         can still be loading. */
+      extern unsigned char *xss_grab_image_file_bytes (unsigned long *,
+                                                       char **);
+      unsigned long size = 0;
+      char *name = 0;
+      unsigned char *bytes = xss_grab_image_file_bytes (&size, &name);
+      if (bytes)
+        {
+          if (st->image_data) free (st->image_data);
+          st->image_data = bytes;
+          st->image_size = size;
+          st->start_time = time ((time_t *) 0);
+        }
+      if (name) free (name);
+#else
       st->pipe = open_image_name_pipe();
       st->pipe_id =
-        XtAppAddInput (XtDisplayToApplicationContext (dpy), 
+        XtAppAddInput (XtDisplayToApplicationContext (dpy),
                        fileno (st->pipe),
                        (XtPointer) (XtInputReadMask | XtInputExceptMask),
                        xscreensaver_getimage_file_cb, (XtPointer) st);
+#endif
     }
 
   if (st->image_data && !st->button_down_p)

@@ -245,6 +245,20 @@ if(EMSCRIPTEN)
   # every hack links xss_port, so a --shell-file edit relinks them all
   set_property(TARGET xss_port PROPERTY INTERFACE_LINK_DEPENDS
                ${CMAKE_SOURCE_DIR}/src/web/shell.html)
+  # Stage the bundled image set into the build dir so pages served
+  # straight from it (tests/sweep-web.sh, tests/smoke-web.sh) resolve
+  # the shell's ../images/ prefetch just like the deployed web/ layout
+  # does. deploy-web.sh builds the same index for web/images/.
+  file(GLOB XSS_WEB_IMAGES ${CMAKE_SOURCE_DIR}/assets/images/*.jpg)
+  file(COPY ${XSS_WEB_IMAGES} DESTINATION ${CMAKE_BINARY_DIR}/images)
+  set(XSS_WEB_IMAGE_INDEX "[")
+  foreach(img ${XSS_WEB_IMAGES})
+    get_filename_component(img_name ${img} NAME)
+    string(APPEND XSS_WEB_IMAGE_INDEX "\"${img_name}\", ")
+  endforeach()
+  string(REGEX REPLACE ", $" "" XSS_WEB_IMAGE_INDEX "${XSS_WEB_IMAGE_INDEX}")
+  string(APPEND XSS_WEB_IMAGE_INDEX "]")
+  file(WRITE ${CMAKE_BINARY_DIR}/images/index.json "${XSS_WEB_IMAGE_INDEX}")
 endif()
 
 # xss_add_xhack(<name> [extra sources...]) -> port a real 2D hack

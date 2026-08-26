@@ -181,6 +181,20 @@ grab_image_bytes (size_t *len_ret, char **name_ret)
 
 #endif
 
+/* Raw file bytes for hacks that corrupt the encoded image themselves
+ * (glitchpeg). Same sources as the draw hook below; caller frees both. */
+unsigned char *
+xss_grab_image_file_bytes (unsigned long *len_ret, char **name_ret)
+{
+  size_t len = 0;
+  char *name = NULL;
+  unsigned char *bytes = grab_image_bytes (&len, &name);
+  if (!bytes) return NULL;
+  *len_ret = (unsigned long) len;
+  *name_ret = name;
+  return bytes;
+}
+
 /* ---- the hook --------------------------------------------------------- */
 
 char *

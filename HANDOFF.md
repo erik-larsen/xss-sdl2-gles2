@@ -68,13 +68,7 @@ three separate false catastrophes in one session — see the gotcha below.
 - `boxfit` and `vfeedback` were *rig* flakiness, now fixed by the blank
   retry. They render.
 
-**2. `glitchpeg` — the one wired hack that renders blank.** It
-`popen()`s `xscreensaver-getimage-file` to *name* a file, then corrupts
-the JPEG bytes itself. Options, cheapest first: point its filename
-function at `assets/images/` on native and write one prefetched image
-into MEMFS on web (the shell already has the bytes in
-`Module.xssImages`); or give the port a tiny `xscreensaver-getimage-file`
-shim. Either way it is a port patch, not plumbing.
+**2. `glitchpeg` — FIXED (M13), pending suite re-run.** It now pulls raw JPEG bytes from the port's image source (`xss_grab_image_file_bytes` in grabclient-sdl.c) and decodes corrupted JPEGs via an stb fallback in jwxyz-png.c; the popen/Xt pipe is compiled out under `XSS_SDL_PORT`. Verified by hand native (two differing full-frame glitch shots) and web (verify-web.js: nonBlank, 3995 colors). M13b also stages `assets/images/` + `index.json` into `build-web/`, so swept pages get real photos — **the next web sweep will show grab hacks switching from colour bars to photos; that is expected, not a regression.**
 
 **3. Windows runtime bring-up (M4b).** The job builds and packages; no
 binary has ever been *run*. Expect ANGLE/EGL surface issues, and note

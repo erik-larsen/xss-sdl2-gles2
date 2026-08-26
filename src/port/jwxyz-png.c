@@ -5,6 +5,10 @@
  * android.graphics.Bitmap).  Here: libpng, normalized to 8-bit RGBA,
  * returned as a 32bpp ZPixmap XImage whose pixels are RGBA in memory --
  * the same layout jwxyz-image and the GL texture loaders expect.
+ *
+ * Non-PNG data falls through to stb_image (implementation lives in
+ * grabclient-sdl.c): glitchpeg feeds image_data_to_ximage() the raw --
+ * deliberately corrupted -- bytes of the bundled JPEGs.
  */
 
 #include "config.h"
@@ -14,6 +18,8 @@
 #include <png.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "stb_image.h"
 
 typedef struct { const unsigned char *p; size_t left; } png_src;
 
@@ -27,13 +33,32 @@ read_fn (png_structp png, png_bytep out, png_size_t n)
   src->left -= n;
 }
 
+static XImage *
+stb_to_ximage (Display *dpy, const unsigned char *data,
+               unsigned long data_size)
+{
+  int w = 0, h = 0, comp = 0;
+  unsigned char *rgba = stbi_load_from_memory (data, (int) data_size,
+                                               &w, &h, &comp, 4);
+  if (!rgba || w < 1 || h < 1) {
+    stbi_image_free (rgba);
+    return NULL;
+  }
+  /* Copy: XDestroyImage free()s ->data, stb owns its own buffer. */
+  char *copy = malloc ((size_t) w * h * 4);
+  if (!copy) { stbi_image_free (rgba); return NULL; }
+  memcpy (copy, rgba, (size_t) w * h * 4);
+  stbi_image_free (rgba);
+  return XCreateImage (dpy, NULL, 32, ZPixmap, 0, copy, w, h, 32, w * 4);
+}
+
 XImage *
 jwxyz_png_to_ximage (Display *dpy, Visual *visual,
                      const unsigned char *png_data, unsigned long data_size)
 {
   (void) visual;
   if (data_size < 8 || png_sig_cmp (png_data, 0, 8))
-    return NULL;
+    return stb_to_ximage (dpy, png_data, data_size);
 
   png_structp png = png_create_read_struct (PNG_LIBPNG_VER_STRING, 0, 0, 0);
   png_infop info = png ? png_create_info_struct (png) : NULL;

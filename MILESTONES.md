@@ -841,6 +841,16 @@ be a driver option).
   `main(void)` + `xss_web_args()` shim stays: it is how query-string
   options reach a hack, not merely a workaround for 3.1.6's JS glue.
 
+## M13 — glitchpeg renders (last wired blank hack)
+
+- **M13a ✅ glitchpeg draws on native and web.** It was blank for two independent reasons. First, it never got image bytes: unlike the other grab hacks (which go through `jwxyz_draw_random_image`), glitchpeg `popen()`s `xscreensaver-getimage-file` for a *filename* and reads/corrupts the encoded file bytes itself — no such helper exists in this port, and no `popen` at all on the web. Second, even with bytes it could not decode: `image_data_to_ximage` lands in `jwxyz_png_to_ximage` (libpng, PNG-only), and the bundled image set is all JPEG. Fixes:
+  - `grabclient-sdl.c` exports `xss_grab_image_file_bytes()` — the existing per-platform raw-bytes source (dir scan of `assets/images` natively, `Module.xssImages` on web) behind the draw hook, now callable directly.
+  - `glitchpeg.c` gets a `PATCH(xss-sdl)` block: the reload path calls that hook synchronously instead of the popen/XtAppAddInput pipe (which is compiled out under `XSS_SDL_PORT`). A failed grab just retries next frame — on the web the image list may still be loading.
+  - `jwxyz-png.c` falls through to stb_image (implementation already linked from grabclient-sdl.c) when the data has no PNG signature. stb's JPEG decoder is usefully tolerant of glitchpeg's deliberate corruption: bad entropy data usually ends the scan early rather than failing, which produces exactly the classic banded glitch art (a hard decode failure returns NULL and glitchpeg simply skips that frame and re-corrupts from the pristine copy).
+  Verified: native two shots 15 frames apart, both full-frame glitch art, differing (not static); web via `verify-web.js` — nonBlank, nonBlackFrac 1, 3995 colors. Windows stays blank (its `grab_image_bytes` returns NULL until the Windows runtime bring-up).
+
+- **M13b ✅ the web build dir now carries the image set.** The shell prefetches `../images/index.json`, which resolves against server root when pages are served straight out of `build-web` — the layout `sweep-web.sh` and `smoke-web.sh` use — and only `deploy-web.sh`'s `web/` layout actually had `images/`. So on the sweep rig every grab hack silently ran the colour-bars fallback and glitchpeg had nothing at all. The emscripten CMake config now stages `assets/images/*.jpg` + a generated `index.json` into `${CMAKE_BINARY_DIR}/images`, so swept pages see the same images the deployed gallery does. (Expect the next sweep to change grab-hack visuals from colour bars to photos — that is this, not a regression.)
+
 ## M3a (emscripten) -- delivered
 
 First WebAssembly build of the xscreensaver codebase (no prior art
