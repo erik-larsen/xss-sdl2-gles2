@@ -758,6 +758,19 @@ void draw_renderlist(renderlist_t *list) {
                     use_vbo_indices = 1;
                 } else {
                     int vbo_indices = 0;
+#ifdef __EMSCRIPTEN__
+                    /* PATCH(xss-sdl): if this list's attribs are
+                       client-side (no list VBO -- e.g. glBegin-recorded
+                       lists, which glBegin stamps use_vbo_array=2 so
+                       list2VBO never runs), keep the indices client-side
+                       too. emscripten's FULL_ES2 computes the client-
+                       attrib upload size by scanning *client* indices;
+                       with a real ELEMENT_ARRAY_BUFFER bound it uploads
+                       ZERO bytes per attrib and the draw rasterizes
+                       nothing (peepers' eyeballs, invisible on web). */
+                    if(!use_vbo_indices && !(use_vbo_array==2 && list->vbo_array))
+                        use_vbo_indices = 1;
+#endif
                     if(!use_vbo_indices) {
                         // create VBO for indices
                         LOAD_GLES2(glGenBuffers);
