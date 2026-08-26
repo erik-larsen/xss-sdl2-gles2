@@ -415,7 +415,13 @@ void draw_renderlist(renderlist_t *list) {
             }
         }
         if (list->fog_op) {
-            gl4es_glFogfv(GL_FOG_COLOR, list->fog_val);
+            /* PATCH(xss-sdl): replay the recorded pname, not always
+               GL_FOG_COLOR. rlFogOp stores one glFog* call per segment
+               (mode, density, start, ...); replaying every one of them
+               as GL_FOG_COLOR left mode/density at defaults (GL_EXP,
+               1.0), fogging any dlist-compiled scene to solid black
+               (vigilance). */
+            gl4es_glFogfv(list->fog_op, list->fog_val);
         }
         if (list->pointparam_op) {
             switch (list->pointparam_op) {

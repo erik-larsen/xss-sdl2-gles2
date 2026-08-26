@@ -54,8 +54,7 @@ three separate false catastrophes in one session — see the gotcha below.
   natively (30 frames blew a 10-minute cap), so the harness times out.
   It renders fine on the web. `worldpieces` shares `earth.c` and is
   fine, so suspect dymaxionmap's own per-frame work. Profile first.
-- **`vigilance` — renders nothing**, native and web alike. Wires and
-  links; something in its own draw path.
+- **`vigilance` — FIXED (M13c), pending suite re-run.** A gl4es bug: fog calls compiled into a display list all replayed as `GL_FOG_COLOR`, leaving fog mode/density at defaults and fogging the scene to solid black. One-line `PATCH(xss-sdl)` in third_party/gl4es/src/gl/listdraw.c. Verified by hand native and web.
 - **`peepers` — renders very dark on the web only** (maxLum 18–44
   against 95,948 colors natively), which puts it right on the
   verifier's `maxLum > 16` threshold. A real web-side difference worth
