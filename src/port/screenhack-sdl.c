@@ -65,6 +65,22 @@ consume_hack_options (const XrmOptionDescRec *opts, int argc, char **argv)
 {
   int out = 1;
   for (int i = 1; i < argc; i++) {
+    /* The driver's own flags are reserved in their double-dash
+     * spelling and must never fold into a same-named hack option:
+     * dymaxionmap has "-frames" (day/night animation frame count), so
+     * "--frames 3" was consumed here, the driver ran unbounded, and
+     * the harness read the never-ending run as "too slow to sample".
+     * "-frames" (single dash) still reaches the hack. */
+    if (!strcmp (argv[i], "--width")  || !strcmp (argv[i], "--height") ||
+        !strcmp (argv[i], "--frames") || !strcmp (argv[i], "--shot")) {
+      argv[out++] = argv[i];
+      if (i + 1 < argc) argv[out++] = argv[++i];
+      continue;
+    }
+    if (!strcmp (argv[i], "--fps")) {
+      argv[out++] = argv[i];
+      continue;
+    }
     /* Tables use X-style single-dash options ("-delay", "-no-wander");
      * accept the GNU spelling the config XMLs / web query args use. */
     const char *arg = argv[i];

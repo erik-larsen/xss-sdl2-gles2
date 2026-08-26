@@ -50,10 +50,7 @@ three separate false catastrophes in one session — see the gotcha below.
 
 **1a. What the suites flagged, and how much is real:**
 
-- **`dymaxionmap` — unusably slow, not crashed.** Worse than 20 s/frame
-  natively (30 frames blew a 10-minute cap), so the harness times out.
-  It renders fine on the web. `worldpieces` shares `earth.c` and is
-  fine, so suspect dymaxionmap's own per-frame work. Profile first.
+- **`dymaxionmap` — FIXED (M13e), was never slow.** Its own `-frames` option (animation frame count) swallowed the harness's `--frames N`, so the run was unbounded and the 10-minute cap looked like slowness. Driver flags are now reserved in their double-dash spelling (screenhack-sdl.c); 30 frames + shot now take 1.5 s. Same fix un-shadows anemone/rdbomb/splitflap's `-width`/`-height` count options from the driver's window geometry.
 - **`vigilance` — FIXED (M13c), pending suite re-run.** A gl4es bug: fog calls compiled into a display list all replayed as `GL_FOG_COLOR`, leaving fog mode/density at defaults and fogging the scene to solid black. One-line `PATCH(xss-sdl)` in third_party/gl4es/src/gl/listdraw.c. Verified by hand native and web.
 - **`peepers` — FIXED (M13d), pending suite re-run.** glBegin-recorded display lists replayed with client-side attribs while their indices sat in a real element VBO; emscripten's FULL_ES2 then sized every client-attrib upload from *client* indices it couldn't see — zero bytes, zero fragments. `PATCH(xss-sdl)` in third_party/gl4es/src/gl/listdraw.c keeps indices client-side in that case (emscripten only). Web-dim results elsewhere may improve in the next sweep for the same reason.
 - **`lightning` — takes ~30 s to draw anything**, on both platforms.
