@@ -26,7 +26,7 @@ upstream hack source.
   **275 cards** (`gen_gallery.py` cards what `tests/STATUS.csv` marks
   `pass`/`static`).
 - Toolchain is pinned in **`toolchain.versions`** (emsdk 4.0.12, node
-  20.20.2, chrome 152.0.7977.54, images ubuntu-24.04 / macos-15 /
+  22.23.4, chrome 152.0.7977.54, images ubuntu-24.04 / macos-15 /
   windows-2025). Actions are SHA-pinned; `scripts/check-toolchain.py`
   enforces all of it in CI. The emsdk 3.1.6 → 4.0.12 bump is verified by
   the sweep above: no regressions, no clusters.

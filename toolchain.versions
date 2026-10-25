@@ -28,8 +28,9 @@
 EMSDK_VERSION=4.0.12
 
 # Node + Chrome are the headless verification rig (tests/verify-web.js),
-# not the build. Both are pinned to what CI resolved on 2026-08-24.
-NODE_VERSION=20.20.2
+# not the build. Chrome is what CI resolved on 2026-08-24; node is the
+# 22 LTS October 2026 security release (puppeteer-core 25 needs >=22.12).
+NODE_VERSION=22.23.4
 CHROME_VERSION=152.0.7977.54
 
 # --- runner images ----------------------------------------------------

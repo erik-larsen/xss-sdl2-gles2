@@ -74,7 +74,7 @@ function delta(a, b) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: findChrome(), headless: 'new',
+      executablePath: findChrome(), headless: true,
       args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader',
              '--enable-unsafe-swiftshader', '--disable-dev-shm-usage'],
     });
@@ -86,24 +86,26 @@ function delta(a, b) {
       { timeout: 30000 }).catch(() => {});
     await new Promise(r => setTimeout(r, waitMs));
     const c = await page.$('#canvas');
+    // puppeteer >= 22 returns a Uint8Array; pngjs needs a Buffer.
+    const shot = async () => Buffer.from(await c.screenshot());
     // Sample twice, 700ms apart: the pair gives both "is anything there"
     // and "does it move". A blank pair gets one more chance after a
     // longer wait, the way tests/harness.py already retries natively --
     // several hacks are simply slow to put anything on screen (lightning)
     // or spend their opening seconds dark (vfeedback, boxfit), and a
     // single early sample calls those blank at random.
-    let A = await c.screenshot();
+    let A = await shot();
     await new Promise(r => setTimeout(r, 700));
-    let B = await c.screenshot();
+    let B = await shot();
     let sb = stats(B);
     let retried = false;
 
     if (!(sb.maxLum > 16 && sb.nonBlackFrac > 0.0003)) {
       retried = true;
       await new Promise(r => setTimeout(r, waitMs * 2));
-      A = await c.screenshot();
+      A = await shot();
       await new Promise(r => setTimeout(r, 700));
-      B = await c.screenshot();
+      B = await shot();
       sb = stats(B);
     }
 

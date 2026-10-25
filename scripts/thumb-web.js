@@ -89,7 +89,7 @@ function better(a, b) {          // is a a better shot than b?
 
   const browser = await puppeteer.launch({
     executablePath: findChrome(),
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage',
            '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
            '--window-size=800,600', '--hide-scrollbars'],
@@ -104,7 +104,8 @@ function better(a, b) {          // is a a better shot than b?
     const t0 = Date.now();
     while (Date.now() - t0 < duration) {
       await new Promise(r => setTimeout(r, interval));
-      const shot = await page.screenshot({ type: 'png' });
+      // puppeteer >= 22 returns a Uint8Array; pngjs needs a Buffer.
+      const shot = Buffer.from(await page.screenshot({ type: 'png' }));
       const s = score(shot);
       samples++;
       if (better(s, bestScore)) { best = shot; bestScore = s; }
