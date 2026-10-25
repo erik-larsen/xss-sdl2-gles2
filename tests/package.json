@@ -4,7 +4,7 @@
   "private": true,
   "description": "Headless-browser smoke verifier deps for tests/smoke-web.sh",
   "dependencies": {
-    "puppeteer-core": "^21.0.0",
+    "puppeteer-core": "^25.16.0",
     "pngjs": "^7.0.0"
   }
 }
