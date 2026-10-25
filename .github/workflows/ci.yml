@@ -96,7 +96,7 @@ jobs:
 
       - name: Install verifier deps
         working-directory: tests
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Web smoke suite (headless Chromium + SwiftShader)
         env:
